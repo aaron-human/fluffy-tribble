@@ -1,0 +1,13 @@
+[package]
+name = "fluffy_tribble"
+version = "0.0.0"
+authors = ["aaron-human"]
+edition = "2018"
+description = "An excuse to learn how 3D game physics engines work."
+readme = "README.md"
+repository = "https://github.com/aaron-human/fluffy-tribble"
+
+[dependencies]
+
+nalgebra = "0.24.0"
+generational-arena = "0.2.8"
