@@ -9,6 +9,7 @@ mod collider;
 pub use collider::Collider;
 mod sphere_collider;
 pub use sphere_collider::SphereCollider;
+pub mod collider_wrapper;
 mod collision;
 
 pub mod physics_system;
