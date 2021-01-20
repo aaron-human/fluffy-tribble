@@ -38,8 +38,8 @@ impl PhysicsSystem {
 		self.entities.get_mut(handle).ok_or(()).and_then(|internal| internal.update_from(source))
 	}
 
-	/// Moves the system forward by the given step.
-	pub fn update(&mut self, dt : f32) {
+	/// Moves the system forward by the given time step.
+	pub fn step(&mut self, dt : f32) {
 		for (_handle, entity) in &mut self.entities {
 			let acceleration = Vec3::zeros(); // TODO: Calculate acceleration.
 			entity.velocity += acceleration.scale(dt);
@@ -56,7 +56,7 @@ mod tests {
 	fn basic_update() {
 		let mut system = PhysicsSystem::new();
 		// Check nothing breaks with no items.
-		system.update(1.0);
+		system.step(1.0);
 		let first = system.add_entity(&Vec3::new(1.0, 2.0, 3.0));
 		{
 			let mut interface = system.get_entity(first).unwrap();
@@ -73,7 +73,7 @@ mod tests {
 			assert_eq!(interface.velocity.y, 0.0);
 			assert_eq!(interface.velocity.z, 0.0);
 		}
-		system.update(1.0);
+		system.step(1.0);
 		{
 			let interface = system.get_entity(first).unwrap();
 			assert_eq!(interface.position.x, 2.0);
