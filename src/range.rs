@@ -1,9 +1,11 @@
 use std::f32::{NAN, INFINITY};
 
+use crate::consts::EPSILON;
+
 /// A continuous range of scalar values.
 /// Can also represent all values and no values.
 /// Note that if any of the values are NaN, then the range represents an empty range.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Range {
 	/// The lower bound.
 	min : f32,
@@ -75,6 +77,31 @@ impl Range {
 			min: if self.min < other.min { self.min } else { other.min },
 			// And the largest max.
 			max: if self.max > other.max { self.max } else { other.max },
+		}
+	}
+
+	/// Creates a range that's got end points at the zeros of a quadratic.
+	/// Can also have no end points if the quadratic has no zeros.
+	pub fn quadratic_zeros(a : f32, b : f32, c : f32) -> Range {
+		if a.abs() < EPSILON {
+			// Degenerates to a linear equation.
+			if b.abs() < EPSILON {
+				// Degenerates to a constant "equation".
+				if c < EPSILON { Range::everything() } else { Range::empty() }
+			} else {
+				Range::single(-c / b)
+			}
+		} else {
+			let mut det = b * b - 4.0 * a * c;
+			if det < -EPSILON { // TODO: Could use a relative epsilon to keep things stable even in tiny cases.
+				Range::empty()
+			} else if det < EPSILON {
+				Range::single(-0.5 * b / a)
+			} else {
+				det = det.sqrt();
+				let denom = 2.0 * a;
+				Range::range((-b + det) / denom, (-b - det) / denom)
+			}
 		}
 	}
 }
@@ -188,6 +215,42 @@ mod tests {
 				assert_eq!(upper_lower.min(), -2.0);
 				assert_eq!(upper_lower.max(),  2.0);
 			}
+		}
+	}
+
+	#[test]
+	fn check_quadratic() {
+		{ // (2x - 1) * (x - 3) = 2x^2 - 7x + 3
+			let zeros = Range::quadratic_zeros(2.0, -7.0, 3.0);
+			assert!((zeros.min() - 0.5).abs() < EPSILON);
+			assert!((zeros.max() - 3.0).abs() < EPSILON);
+		}
+		{ // (x + 2) * (x + 2) = x^2 + 4x + 4
+			let zeros = Range::quadratic_zeros(1.0, 4.0, 4.0);
+			assert!((zeros.min() - -2.0).abs() < EPSILON);
+			assert!((zeros.max() - -2.0).abs() < EPSILON);
+		}
+		{ // (x + i) * (x - i) = x^2 + 1
+			let zeros = Range::quadratic_zeros(1.0, 0.0, 1.0);
+			assert!(zeros.is_empty());
+		}
+	}
+
+	#[test]
+	fn check_quadratic_degenrate() {
+		{ // 0 = 0
+			let zeros = Range::quadratic_zeros(0.0, 0.0, 0.0);
+			assert!(zeros.min() <= -INFINITY);
+			assert!(zeros.max() >=  INFINITY);
+		}
+		{ // 0 = 1
+			let zeros = Range::quadratic_zeros(0.0, 0.0, 1.0);
+			assert!(zeros.is_empty());
+		}
+		{ // 0 = x + 2
+			let zeros = Range::quadratic_zeros(0.0, 1.0, 2.0);
+			assert!((zeros.min() - -2.0).abs() < EPSILON);
+			assert!((zeros.max() - -2.0).abs() < EPSILON);
 		}
 	}
 }

@@ -11,3 +11,4 @@ repository = "https://github.com/aaron-human/fluffy-tribble"
 
 nalgebra = "0.24.0"
 generational-arena = "0.2.8"
+downcast-rs = "1.2.0"
