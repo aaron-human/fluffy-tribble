@@ -1,5 +1,6 @@
-use crate::types::Vec3;
+use std::collections::HashSet;
 
+use crate::types::{Vec3, ColliderHandle};
 
 /// The internal representation of any physical object.
 /// This generally has NO data hiding to keep things simple.
@@ -8,6 +9,8 @@ pub struct InternalEntity {
 	pub position : Vec3,
 	/// The current 3D velocity.
 	pub velocity : Vec3,
+	/// All colliders that are attached/linked to this.
+	pub colliders : HashSet<ColliderHandle>,
 }
 
 impl InternalEntity {
@@ -16,6 +19,7 @@ impl InternalEntity {
 		InternalEntity {
 			position: position.clone(),
 			velocity: Vec3::zeros(),
+			colliders: HashSet::new(),
 		}
 	}
 
@@ -35,6 +39,8 @@ pub struct Entity {
 	pub position : Vec3,
 	/// The current 3D velocity.
 	pub velocity : Vec3,
+	/// All colliders that are attached/linked to this.
+	colliders : HashSet<ColliderHandle>,
 }
 
 impl Entity {
@@ -43,6 +49,13 @@ impl Entity {
 		Entity {
 			position: source.position.clone(),
 			velocity: source.velocity.clone(),
+			colliders: source.colliders.clone(),
 		}
+	}
+
+	/// Gets all collider handles.
+	/// Notibly this is just the getter, as this object cannot be used to modify what colliders are attached to this entity.
+	pub fn get_colliders(&self) -> HashSet<ColliderHandle> {
+		self.colliders.clone()
 	}
 }

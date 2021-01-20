@@ -16,9 +16,9 @@ pub trait InternalCollider : Downcast + Debug {
 	/// The specific type.
 	fn get_type(&self) -> ColliderType;
 	/// Sets the entity this is attached to.
-	fn set_entity_handle(&mut self, handle : Option<EntityHandle>) -> Option<EntityHandle>;
+	fn set_entity(&mut self, handle : Option<EntityHandle>) -> Option<EntityHandle>;
 	/// Retrieves the stored entity handle that this is attached to.
-	fn get_entity_handle(&mut self) -> Option<EntityHandle>;
+	fn get_entity(&mut self) -> Option<EntityHandle>;
 }
 
 impl dyn InternalCollider {
@@ -34,7 +34,7 @@ pub trait Collider : Downcast + Debug {
 
 	/// Gets the entity this is linked to (if there is one).
 	/// This is read-only. To link things together, use PhysicsSystem.link_collider().
-	fn get_entity_handle(&self) -> Option<EntityHandle>;
+	fn get_entity(&self) -> Option<EntityHandle>;
 }
 
 impl dyn Collider {

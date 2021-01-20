@@ -59,14 +59,14 @@ impl InternalCollider for InternalSphereCollider {
 	fn get_type(&self) -> ColliderType { ColliderType::SPHERE }
 
 	/// Sets the entity this is attached to, returning the previous one.
-	fn set_entity_handle(&mut self, handle : Option<EntityHandle>) -> Option<EntityHandle> {
+	fn set_entity(&mut self, handle : Option<EntityHandle>) -> Option<EntityHandle> {
 		let old = self.entity;
 		self.entity = handle;
 		old
 	}
 
 	/// Retrieves the stored entity handle that this is attached to.
-	fn get_entity_handle(&mut self) -> Option<EntityHandle> {
+	fn get_entity(&mut self) -> Option<EntityHandle> {
 		self.entity
 	}
 }
@@ -102,5 +102,5 @@ impl SphereCollider {
 impl Collider for SphereCollider {
 	fn get_type(&self) -> ColliderType { ColliderType::SPHERE }
 
-	fn get_entity_handle(&self) -> Option<EntityHandle> { self.entity }
+	fn get_entity(&self) -> Option<EntityHandle> { self.entity }
 }

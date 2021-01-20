@@ -28,9 +28,16 @@ impl PhysicsSystem {
 		self.entities.insert(InternalEntity::new(position))
 	}
 
-	/// Removes an entity.
-	pub fn remove_entity(&mut self, handle : EntityHandle) {
-		self.entities.remove(handle);
+	/// Removes an entity and all of it's associated colliders.
+	/// Returns if anything changed (i.e. if the entity existed and was removed).
+	pub fn remove_entity(&mut self, handle : EntityHandle) -> bool {
+		if let Some(entity) = self.entities.remove(handle) {
+			// Also remove all associated colliders.
+			for collider in entity.colliders {
+				self.remove_collider(collider);
+			}
+			true
+		} else { false }
 	}
 
 	/// Gets an entity's public interface.
@@ -40,6 +47,7 @@ impl PhysicsSystem {
 	}
 
 	/// Updates an entity with the given values.
+	/// This does NOT update the list of linked/attached colliders. Must use link_collider() for that.
 	pub fn update_entity(&mut self, handle : EntityHandle, source : Entity) -> Result<(),()> {
 		self.entities.get_mut(handle).ok_or(()).and_then(|internal| internal.update_from(source))
 	}
@@ -77,6 +85,7 @@ impl PhysicsSystem {
 
 	/// Gets the collider's public interface.
 	/// These values are all copies of the internal collider.
+	/// This does NOT update the list of linked/attached colliders. Must use link_collider() for that.
 	pub fn update_collider(&mut self, handle : ColliderHandle, source : ColliderWrapper) -> Result<(), ()> {
 		match source {
 			ColliderWrapper::Sphere(typed_source) => {
@@ -87,11 +96,32 @@ impl PhysicsSystem {
 		}
 	}
 
-	/*// Links the collider to the entity.
+	/// Links the collider to the entity.
 	/// Will unlink it from any existing entity.
-	pub fn link_collider(&mut self, collider_handle : ColliderHandle, entity_handle : EntityHandle) -> Result<(), ()> {
-		//
-	}*/
+	pub fn link_collider(&mut self, collider_handle : ColliderHandle, entity_handle : Option<EntityHandle>) -> Result<(), ()> {
+		// ;Start by getting the collider. Nothing happens without it existing.
+		if let Some(collider_box) = self.colliders.get_mut(collider_handle) {
+			// Then try to handle the passed in entity_handle, which can be None...
+			// This part is mainly done before anything else so won't touch the collider unless entity_handle is valid.
+			if let Some(handle) = entity_handle.clone() {
+				if let Some(entity) = self.entities.get_mut(handle) {
+					entity.colliders.insert(collider_handle);
+				} else { return Err(()); }
+			}
+			// Then switch out the value in the collider.
+			if let Some(prior_entity_handle) = collider_box.as_mut().set_entity(entity_handle) {
+				// Try to get the old entity and remove this collider from it.
+				// Only do this if the entity changed.
+				if Some(prior_entity_handle) != entity_handle {
+					if let Some(prior_entity) = self.entities.get_mut(prior_entity_handle) {
+						prior_entity.colliders.remove(&collider_handle);
+					}
+					// Ignore if the entity no longer exists (shouldn't happen, but also there's really no reason to complain if it does).
+				}
+			}
+			Ok(())
+		} else { Err(()) }
+	}
 
 	/// Moves the system forward by the given time step.
 	pub fn step(&mut self, dt : f32) {
@@ -107,6 +137,7 @@ impl PhysicsSystem {
 mod tests {
 	use super::*;
 
+	/// Verify can create/store/remove entities.
 	#[test]
 	fn basic_update() {
 		let mut system = PhysicsSystem::new();
@@ -146,6 +177,7 @@ mod tests {
 		}
 	}
 
+	/// Verify can create/store/remove colliders.
 	#[test]
 	fn store_collider() {
 		let mut system = PhysicsSystem::new();
@@ -158,7 +190,7 @@ mod tests {
 			assert_eq!(interface.center.y, 0.0);
 			assert_eq!(interface.center.z, 1.0);
 			assert_eq!(interface.radius, 2.0);
-			assert_eq!(interface.get_entity_handle(), None);
+			assert_eq!(interface.get_entity(), None);
 			interface.center.x = 5.0;
 			system.update_collider(id, ColliderWrapper::Sphere(interface)).unwrap();
 		} else {
@@ -176,6 +208,105 @@ mod tests {
 		{
 			let interface = system.get_collider(id);
 			assert!(interface.is_none());
+		}
+	}
+
+	/// Verify can link colliders to entities.
+	#[test]
+	fn link_collider() {
+		let mut system = PhysicsSystem::new();
+		let first = system.add_entity(&Vec3::zeros());
+		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+			&Vec3::new(0.0, 0.0, 1.0),
+			2.0,
+		))).unwrap();
+		{ // Entities start with no colliders. And colliders start with no entities.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), None);
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		system.link_collider(collider, Some(first)).unwrap();
+		{ // Can add and things work right.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 1);
+			assert!(interface.get_colliders().contains(&collider));
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), Some(first));
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		let second = system.add_entity(&Vec3::zeros());
+		system.link_collider(collider, Some(second)).unwrap();
+		{ // Can transfer collider easily.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			let interface = system.get_entity(second).unwrap();
+			assert_eq!(interface.get_colliders().len(), 1);
+			assert!(interface.get_colliders().contains(&collider));
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), Some(second));
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		{ // Verify can't add a collider to a missing entity.
+			let temp = system.add_entity(&Vec3::zeros());
+			system.remove_entity(temp);
+			assert_eq!(system.link_collider(collider, Some(temp)), Err(()));
+			// That shouldn't have changed anything.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			let interface = system.get_entity(second).unwrap();
+			assert_eq!(interface.get_colliders().len(), 1);
+			assert!(interface.get_colliders().contains(&collider));
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), Some(second));
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		{ // Verify can't add a missing collier to an entity.
+			let temp = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+				&Vec3::new(0.0, 0.0, 1.0),
+				2.0,
+			))).unwrap();
+			system.remove_collider(temp);
+			assert_eq!(system.link_collider(temp, Some(second)), Err(()));
+			// That shouldn't have changed anything.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			let interface = system.get_entity(second).unwrap();
+			assert_eq!(interface.get_colliders().len(), 1);
+			assert!(interface.get_colliders().contains(&collider));
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), Some(second));
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		system.link_collider(collider, Some(second)).unwrap();
+		{ // Verify can "transfer" to current entity.
+			// That shouldn't have changed anything.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			let interface = system.get_entity(second).unwrap();
+			assert_eq!(interface.get_colliders().len(), 1);
+			assert!(interface.get_colliders().contains(&collider));
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), Some(second));
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		system.link_collider(collider, None).unwrap();
+		{ // Can transfer collider to being unowned easily.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			let interface = system.get_entity(second).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			if let ColliderWrapper::Sphere(interface) = system.get_collider(collider).unwrap() {
+				assert_eq!(interface.get_entity(), None);
+			} else { panic!("Didn't get a sphere?"); }
+		}
+		system.link_collider(collider, Some(second)).unwrap();
+		system.remove_entity(second);
+		{ // Removing the entity should also remove the collider.
+			let interface = system.get_entity(first).unwrap();
+			assert_eq!(interface.get_colliders().len(), 0);
+			assert!(system.get_collider(collider).is_none());
 		}
 	}
 }
