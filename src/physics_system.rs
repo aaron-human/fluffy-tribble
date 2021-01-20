@@ -153,18 +153,24 @@ mod tests {
 			&Vec3::new(0.0, 0.0, 1.0),
 			2.0,
 		))).unwrap();
-		{
-			if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
-				assert_eq!(interface.center.x, 0.0);
-				assert_eq!(interface.center.y, 0.0);
-				assert_eq!(interface.center.z, 1.0);
-				assert_eq!(interface.radius, 2.0);
-				assert_eq!(interface.get_entity_handle(), None);
-				interface.center.x = 5.0;
-				system.update_collider(id, ColliderWrapper::Sphere(interface)).unwrap();
-			} else {
-				panic!("The collider didn't unwrap into the right type!");
-			}
+		if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
+			assert_eq!(interface.center.x, 0.0);
+			assert_eq!(interface.center.y, 0.0);
+			assert_eq!(interface.center.z, 1.0);
+			assert_eq!(interface.radius, 2.0);
+			assert_eq!(interface.get_entity_handle(), None);
+			interface.center.x = 5.0;
+			system.update_collider(id, ColliderWrapper::Sphere(interface)).unwrap();
+		} else {
+			panic!("The collider didn't unwrap into the right type!");
+		}
+		if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
+			assert_eq!(interface.center.x, 5.0);
+			assert_eq!(interface.center.y, 0.0);
+			assert_eq!(interface.center.z, 1.0);
+			assert_eq!(interface.radius, 2.0);
+		} else {
+			panic!("The collider didn't unwrap into the right type!");
 		}
 		system.remove_collider(id);
 		{
