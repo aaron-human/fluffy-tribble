@@ -1,5 +1,8 @@
+use std::f32::INFINITY;
+
 use generational_arena::Arena;
 
+use crate::consts::EPSILON;
 use crate::types::{Vec3, EntityHandle, ColliderHandle};
 use crate::entity::{InternalEntity, Entity};
 use crate::collider::{ColliderType, InternalCollider, Collider};
@@ -13,6 +16,8 @@ pub struct PhysicsSystem {
 	entities : Arena<InternalEntity>,
 	/// All of the colliders on the physical objects.
 	colliders : Arena<Box<dyn InternalCollider>>,
+	/// The max number of physics iterations allowed per step.
+	pub iteration_max : u8,
 }
 
 struct EntityStepInfo {
@@ -28,12 +33,13 @@ impl PhysicsSystem {
 		PhysicsSystem {
 			entities: Arena::new(),
 			colliders : Arena::new(),
+			iteration_max : 5,
 		}
 	}
 
 	/// Adds an entity and returns its handle.
-	pub fn add_entity(&mut self, position : &Vec3) -> EntityHandle {
-		self.entities.insert(InternalEntity::new(position))
+	pub fn add_entity(&mut self, position : &Vec3, mass : f32) -> EntityHandle {
+		self.entities.insert(InternalEntity::new(position, mass))
 	}
 
 	/// Removes an entity and all of it's associated colliders.
@@ -145,38 +151,104 @@ impl PhysicsSystem {
 		}
 
 		// TODO: Setup a broad-phase that checks AABBs.
+		// That should be able to split the world into islands of boxes that collide
 
-		// Go through every unique pair of handles and deal with collisions.
-		for first_handle_index in 0..entity_info.len() {
-			// Get both entity_info elements.
-			let (lower_entity_infos, upper_entity_infos) = entity_info.split_at_mut(first_handle_index+1);
-			let first_entity_info = &mut lower_entity_infos[first_handle_index];
-			for second_entity_info in upper_entity_infos {
-				let (first_option, second_option) = self.entities.get2_mut(first_entity_info.handle, second_entity_info.handle);
-				let first = first_option.unwrap();
-				let second = second_option.unwrap();
-				//
-				for first_collider_handle in first.colliders.iter() {
-					for second_collider_handle in second.colliders.iter() {
-						let first_collider_box  = self.colliders.get(*first_collider_handle ).unwrap();
-						let second_collider_box = self.colliders.get(*second_collider_handle).unwrap();
-						let collision_option = collide(
-							first_collider_box,
-							&first.position,
-							&first_entity_info.movement,
-							second_collider_box,
-							&second.position,
-							&second_entity_info.movement,
-						);
-						if let Some(collision) = collision_option {
-							//
+		const RESTITUTION : f32 = 1.0; // The current restitution coefficient.
+		// TODO: Will make the above based on object properties in the future!
+
+		let mut time_left = dt;
+		for _iteration in 0..self.iteration_max {
+			// TODO: Someday optimize so it keeps track of collisions, and only calculates new collisions if one of the associated bodies has been modified by the last iteration.
+
+			let mut earliest_collision_percent = INFINITY;
+			let mut earliest_collision = None;
+			let mut earliest_collision_first_entity_handle = None;
+			let mut earliest_collision_second_entity_handle = None;
+			// Go through every unique pair of handles and deal with collisions.
+			for first_handle_index in 0..entity_info.len() {
+				// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
+				// Will be "done" once no collisions left or run out of iterations.
+
+				// So start by finding the first collision in the allotted time.
+				let (lower_entity_infos, upper_entity_infos) = entity_info.split_at_mut(first_handle_index+1);
+				let first_entity_info = &mut lower_entity_infos[first_handle_index];
+				for second_entity_info in upper_entity_infos {
+					let (first_option, second_option) = self.entities.get2_mut(first_entity_info.handle, second_entity_info.handle);
+					let first = first_option.unwrap();
+					let second = second_option.unwrap();
+					//
+					for first_collider_handle in first.colliders.iter() {
+						for second_collider_handle in second.colliders.iter() {
+							let first_collider_box  = self.colliders.get(*first_collider_handle ).unwrap();
+							let second_collider_box = self.colliders.get(*second_collider_handle).unwrap();
+							let collision_option = collide(
+								first_collider_box,
+								&first.position,
+								&first_entity_info.movement,
+								second_collider_box,
+								&second.position,
+								&second_entity_info.movement,
+							);
+							if let Some(collision) = collision_option {
+								// If the objects are (already) moving away from the point of contact, then ignore the collision.
+								let time = collision.times.min();
+								let first_position  = first.position  + first_entity_info.movement  * time;
+								let second_position = second.position + second_entity_info.movement * time;
+								let first_collision_offset  = collision.position - first_position;
+								let second_collision_offset = collision.position - second_position;
+								let first_moving_away  = EPSILON > first_collision_offset.dot(  &first.velocity);
+								let second_moving_away = EPSILON > second_collision_offset.dot(&second.velocity);
+								if first_moving_away && second_moving_away {
+									continue;
+								}
+								// Otherwise check if this collision is the closest.
+								if time < earliest_collision_percent {
+									earliest_collision_percent = time;
+									earliest_collision = Some(collision);
+									earliest_collision_first_entity_handle = Some(first_entity_info.handle);
+									earliest_collision_second_entity_handle = Some(second_entity_info.handle);
+								}
+							}
 						}
 					}
 				}
 			}
+
+			// No collision means you're done.
+			if 1.0 < earliest_collision_percent {
+				break;
+			}
+			// Handle the collision.
+			let collision = earliest_collision.unwrap();
+			let first_entity_handle = earliest_collision_first_entity_handle.unwrap();
+			let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
+			let (first_option, second_option) = self.entities.get2_mut(first_entity_handle, second_entity_handle);
+			let first = first_option.unwrap();
+			let second = second_option.unwrap();
+			let impulse_magnitude = -(1.0 + RESTITUTION) * (first.velocity - second.velocity).dot(&collision.normal) / (1.0 / first.mass + 1.0 / second.mass); // For now just linear with restitution.
+			let after_collision_percent = 1.0 - earliest_collision_percent;
+			let time_after_collision = time_left * after_collision_percent;
+			// Re-adjust all of the movements to account for time stepping forward and the collision.
+			for info in &mut entity_info {
+				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
+				let entity = self.entities.get_mut(info.handle).unwrap();
+				entity.position += info.movement * earliest_collision_percent;
+				info.movement *= after_collision_percent;
+				// Then check if anything has to change.
+				if first_entity_handle == info.handle {
+					// Apply the impluse and re-integrate the movement.
+					entity.velocity += collision.normal.scale(impulse_magnitude / entity.mass);
+					info.movement = entity.velocity * time_after_collision;
+				} else if second_entity_handle == info.handle {
+					// Apply the impulse and re-integrate the movement.
+					entity.velocity -= collision.normal.scale(impulse_magnitude / entity.mass);
+					info.movement = entity.velocity * time_after_collision;
+				}
+			}
+			time_left = time_after_collision;
 		}
 
-		// Once all the physics has been handled, apply the movement.
+		// Once all the physics has been handled, apply the reamining movement.
 		for info in entity_info {
 			let first = self.entities.get_mut(info.handle).unwrap();
 			first.position += info.movement;
@@ -194,7 +266,7 @@ mod tests {
 		let mut system = PhysicsSystem::new();
 		// Check nothing breaks with no items.
 		system.step(1.0);
-		let first = system.add_entity(&Vec3::new(1.0, 2.0, 3.0));
+		let first = system.add_entity(&Vec3::new(1.0, 2.0, 3.0), 1.0);
 		{
 			let mut interface = system.get_entity(first).unwrap();
 			assert_eq!(interface.position.x, 1.0);
@@ -266,7 +338,7 @@ mod tests {
 	#[test]
 	fn link_collider() {
 		let mut system = PhysicsSystem::new();
-		let first = system.add_entity(&Vec3::zeros());
+		let first = system.add_entity(&Vec3::zeros(), 1.0);
 		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 			&Vec3::new(0.0, 0.0, 1.0),
 			2.0,
@@ -287,7 +359,7 @@ mod tests {
 				assert_eq!(interface.get_entity(), Some(first));
 			} else { panic!("Didn't get a sphere?"); }
 		}
-		let second = system.add_entity(&Vec3::zeros());
+		let second = system.add_entity(&Vec3::zeros(), 1.0);
 		system.link_collider(collider, Some(second)).unwrap();
 		{ // Can transfer collider easily.
 			let interface = system.get_entity(first).unwrap();
@@ -300,7 +372,7 @@ mod tests {
 			} else { panic!("Didn't get a sphere?"); }
 		}
 		{ // Verify can't add a collider to a missing entity.
-			let temp = system.add_entity(&Vec3::zeros());
+			let temp = system.add_entity(&Vec3::zeros(), 1.0);
 			system.remove_entity(temp);
 			assert_eq!(system.link_collider(collider, Some(temp)), Err(()));
 			// That shouldn't have changed anything.
@@ -358,6 +430,46 @@ mod tests {
 			let interface = system.get_entity(first).unwrap();
 			assert_eq!(interface.get_colliders().len(), 0);
 			assert!(system.get_collider(collider).is_none());
+		}
+	}
+
+	/// Verify very basic billiard-ball example: two equal masses. One's at rest, the other hits it exactly head-on. All velocity should travel to the immobile one.
+	#[test]
+	fn equal_mass_billiard_balls() {
+		let mut system = PhysicsSystem::new();
+		let first = system.add_entity(&Vec3::zeros(), 1.0);
+		{
+			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+				&Vec3::zeros(),
+				1.0,
+			))).unwrap();
+			system.link_collider(collider, Some(first)).unwrap();
+		}
+		{
+			let mut temp = system.get_entity(first).unwrap();
+			temp.velocity.x = 2.0;
+			system.update_entity(first, temp).unwrap();
+		}
+		let second = system.add_entity(&Vec3::new(3.0, 0.0, 0.0), 1.0);
+		{
+			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+				&Vec3::zeros(),
+				1.0,
+			))).unwrap();
+			system.link_collider(collider, Some(second)).unwrap();
+		}
+		system.step(1.0);
+		{
+			let temp = system.get_entity(first).unwrap();
+			println!("First after: {:?}", temp);
+			assert!((temp.velocity.x - 0.0).abs() < EPSILON);
+			assert!((temp.position.x - 1.0).abs() < EPSILON);
+		}
+		{
+			let temp = system.get_entity(second).unwrap();
+			println!("Second after: {:?}", temp);
+			assert!((temp.velocity.x - 2.0).abs() < EPSILON);
+			assert!((temp.position.x - 4.0).abs() < EPSILON);
 		}
 	}
 }

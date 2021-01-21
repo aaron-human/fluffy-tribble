@@ -8,7 +8,7 @@ use crate::sphere_collider::{InternalSphereCollider};
 pub struct Collision {
 	/// The range of times when the collision happened. Will be in the range 0.0 (meaning the very start) and 1.0 (the very end).
 	pub times : Range,
-	/// The position of the hit. Will be zero-length if there is no hit.
+	/// The position of the hit.
 	pub position : Vec3,
 	/// The normal of the hit (pointing off the first object).
 	pub normal : Vec3,
