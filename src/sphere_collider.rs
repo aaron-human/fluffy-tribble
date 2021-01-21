@@ -1,4 +1,4 @@
-use crate::types::{Vec3, EntityHandle};
+use crate::types::{Vec3, Mat3, EntityHandle};
 use crate::collider::{ColliderType, Collider, InternalCollider};
 
 /// An amount of radius that allows objects to just be "in contact" without being considered far enough in to force them to be pushed out.
@@ -13,18 +13,21 @@ pub struct InternalSphereCollider {
 	pub center : Vec3,
 	/// The radius.
 	pub radius : f32,
+	/// The total mass. Must not be negative.
+	pub mass : f32,
 }
 
 impl InternalSphereCollider {
 	/// Creates a new instance.
-	pub fn new(offset : &Vec3, radius : f32) -> Result<Box<dyn InternalCollider>, ()> {
-		if CONTACT_MARGIN >= radius {
+	pub fn new(offset : &Vec3, radius : f32, mass : f32) -> Result<Box<dyn InternalCollider>, ()> {
+		if CONTACT_MARGIN >= radius || 0.0 > mass {
 			Err(()) // TODO: An error type.
 		} else {
 			Ok(Box::new(InternalSphereCollider {
 				entity: None,
 				center: offset.clone(),
 				radius,
+				mass,
 			}))
 		}
 	}
@@ -34,6 +37,7 @@ impl InternalSphereCollider {
 		InternalSphereCollider::new(
 			&source.center,
 			source.radius,
+			source.mass,
 		)
 	}
 
@@ -44,7 +48,7 @@ impl InternalSphereCollider {
 
 	/// Updates from the passed in Entity object.
 	pub fn update_from(&mut self, source : &SphereCollider) -> Result<(),()> {
-		if CONTACT_MARGIN >= source.radius {
+		if CONTACT_MARGIN >= source.radius || 0.0 > source.mass {
 			Err(()) // TODO: An error type.
 		} else {
 			self.center = source.center;
@@ -66,8 +70,18 @@ impl InternalCollider for InternalSphereCollider {
 	}
 
 	/// Retrieves the stored entity handle that this is attached to.
-	fn get_entity(&mut self) -> Option<EntityHandle> {
-		self.entity
+	fn get_entity(&mut self) -> Option<EntityHandle> { self.entity }
+
+	/// Gets the center of mass for this collider.
+	fn get_center_of_mass(&self) -> Vec3 { self.center }
+
+	/// Gets the mass of this collider. Must not be negative.
+	fn get_mass(&self) -> f32 { self.mass }
+
+	/// Gets the moment of inertia tensor about the center of mass.
+	fn get_moment_of_inertia_tensor(&self) -> Mat3 {
+		let inertia = 2.0 / 5.0 * self.mass * self.radius;
+		Mat3::from_diagonal(&Vec3::new(inertia, inertia, inertia))
 	}
 }
 
@@ -81,12 +95,14 @@ pub struct SphereCollider {
 	pub center : Vec3,
 	/// The radius.
 	pub radius : f32,
+	/// The total mass.
+	pub mass : f32,
 }
 
 impl SphereCollider {
 	/// Creates an instance.
-	pub fn new(center : &Vec3, radius : f32) -> SphereCollider {
-		SphereCollider { entity: None, center: center.clone(), radius }
+	pub fn new(center : &Vec3, radius : f32, mass : f32) -> SphereCollider {
+		SphereCollider { entity: None, center: center.clone(), radius, mass }
 	}
 
 	/// Creates from an InternalSphereCollider.
@@ -95,6 +111,7 @@ impl SphereCollider {
 			entity: source.entity.clone(),
 			center: source.center.clone(),
 			radius: source.radius,
+			mass: source.mass,
 		}
 	}
 }
@@ -103,4 +120,8 @@ impl Collider for SphereCollider {
 	fn get_type(&self) -> ColliderType { ColliderType::SPHERE }
 
 	fn get_entity(&self) -> Option<EntityHandle> { self.entity }
+
+	fn get_center_of_mass(&self) -> Vec3 { self.center }
+
+	fn get_mass(&self) -> f32 { self.mass }
 }

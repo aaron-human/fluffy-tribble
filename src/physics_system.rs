@@ -307,6 +307,7 @@ mod tests {
 		let id = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 			&Vec3::new(0.0, 0.0, 1.0),
 			2.0,
+			1.0,
 		))).unwrap();
 		if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
 			assert_eq!(interface.center.x, 0.0);
@@ -342,6 +343,7 @@ mod tests {
 		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 			&Vec3::new(0.0, 0.0, 1.0),
 			2.0,
+			1.0,
 		))).unwrap();
 		{ // Entities start with no colliders. And colliders start with no entities.
 			let interface = system.get_entity(first).unwrap();
@@ -389,6 +391,7 @@ mod tests {
 			let temp = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 				&Vec3::new(0.0, 0.0, 1.0),
 				2.0,
+				1.0,
 			))).unwrap();
 			system.remove_collider(temp);
 			assert_eq!(system.link_collider(temp, Some(second)), Err(()));
@@ -442,6 +445,7 @@ mod tests {
 			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 				&Vec3::zeros(),
 				1.0,
+				1.0,
 			))).unwrap();
 			system.link_collider(collider, Some(first)).unwrap();
 		}
@@ -454,6 +458,7 @@ mod tests {
 		{
 			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 				&Vec3::zeros(),
+				1.0,
 				1.0,
 			))).unwrap();
 			system.link_collider(collider, Some(second)).unwrap();
