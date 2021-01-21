@@ -5,6 +5,7 @@ use crate::entity::{InternalEntity, Entity};
 use crate::collider::{ColliderType, InternalCollider, Collider};
 use crate::sphere_collider::{InternalSphereCollider, SphereCollider};
 use crate::collider_wrapper::ColliderWrapper;
+use crate::collision::collide;
 
 /// The entire physics system.
 pub struct PhysicsSystem {
@@ -12,6 +13,13 @@ pub struct PhysicsSystem {
 	entities : Arena<InternalEntity>,
 	/// All of the colliders on the physical objects.
 	colliders : Arena<Box<dyn InternalCollider>>,
+}
+
+struct EntityStepInfo {
+	/// The entity handle.
+	handle : EntityHandle,
+	/// The planned motion for the entity.
+	movement : Vec3,
 }
 
 impl PhysicsSystem {
@@ -125,10 +133,53 @@ impl PhysicsSystem {
 
 	/// Moves the system forward by the given time step.
 	pub fn step(&mut self, dt : f32) {
-		for (_handle, entity) in &mut self.entities {
+		// Go through all entities and perform integration.
+		let mut entity_info = Vec::with_capacity(self.entities.len());
+		for (handle, entity) in self.entities.iter_mut() { // TODO: Optimize this.
 			let acceleration = Vec3::zeros(); // TODO: Calculate acceleration.
 			entity.velocity += acceleration.scale(dt);
-			entity.position += entity.velocity.scale(dt);
+			entity_info.push(EntityStepInfo {
+				handle,
+				movement: entity.velocity.scale(dt),
+			});
+		}
+
+		// TODO: Setup a broad-phase that checks AABBs.
+
+		// Go through every unique pair of handles and deal with collisions.
+		for first_handle_index in 0..entity_info.len() {
+			// Get both entity_info elements.
+			let (lower_entity_infos, upper_entity_infos) = entity_info.split_at_mut(first_handle_index+1);
+			let first_entity_info = &mut lower_entity_infos[first_handle_index];
+			for second_entity_info in upper_entity_infos {
+				let (first_option, second_option) = self.entities.get2_mut(first_entity_info.handle, second_entity_info.handle);
+				let first = first_option.unwrap();
+				let second = second_option.unwrap();
+				//
+				for first_collider_handle in first.colliders.iter() {
+					for second_collider_handle in second.colliders.iter() {
+						let first_collider_box  = self.colliders.get(*first_collider_handle ).unwrap();
+						let second_collider_box = self.colliders.get(*second_collider_handle).unwrap();
+						let collision_option = collide(
+							first_collider_box,
+							&first.position,
+							&first_entity_info.movement,
+							second_collider_box,
+							&second.position,
+							&second_entity_info.movement,
+						);
+						if let Some(collision) = collision_option {
+							//
+						}
+					}
+				}
+			}
+		}
+
+		// Once all the physics has been handled, apply the movement.
+		for info in entity_info {
+			let first = self.entities.get_mut(info.handle).unwrap();
+			first.position += info.movement;
 		}
 	} 
 }
