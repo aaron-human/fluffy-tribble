@@ -53,6 +53,7 @@ impl InternalSphereCollider {
 		} else {
 			self.center = source.center;
 			self.radius = source.radius;
+			self.mass = source.mass;
 			Ok(())
 		}
 	}
@@ -73,6 +74,8 @@ impl InternalCollider for InternalSphereCollider {
 	fn get_entity(&mut self) -> Option<EntityHandle> { self.entity }
 
 	/// Gets the center of mass for this collider.
+	/// This is relative to this collider's owning/linked/attached entity.
+	/// This IS NOT relative to this collider's "center" property.
 	fn get_center_of_mass(&self) -> Vec3 { self.center }
 
 	/// Gets the mass of this collider. Must not be negative.
@@ -122,6 +125,4 @@ impl Collider for SphereCollider {
 	fn get_entity(&self) -> Option<EntityHandle> { self.entity }
 
 	fn get_center_of_mass(&self) -> Vec3 { self.center }
-
-	fn get_mass(&self) -> f32 { self.mass }
 }

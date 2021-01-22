@@ -45,8 +45,6 @@ pub trait Collider : Downcast + Debug {
 
 	/// Gets the center of mass for this collider.
 	fn get_center_of_mass(&self) -> Vec3;
-	/// Gets the mass of this collider. Must not be negative.
-	fn get_mass(&self) -> f32;
 }
 
 impl dyn Collider {
