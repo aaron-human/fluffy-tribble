@@ -679,7 +679,7 @@ mod tests {
 		}
 	}
 
-	/// Check that angular velocity steps like I think it should.
+	/// Check that angular velocity steps like it should.
 	#[test]
 	fn angular_update() {
 		let mut system = PhysicsSystem::new();
@@ -716,7 +716,55 @@ mod tests {
 			assert!((temp.rotation - Vec3::new(0.0, 0.0, 2.0)).magnitude() < EPSILON);
 		}
 	}
-	// TODO! Test moment of inertia/angular momentum!
-	// Only angular inertia into a collision.
-	// Check attaching a collider with mass after rotation has already begun -> verify doesn't look weird.
+
+	/// Hit a pair of spheres in a way that causes the original sphere to stop moving.
+	#[test]
+	fn angular_adsorb_all_momentum() {
+		let mut system = PhysicsSystem::new();
+		let first = system.add_entity(&Vec3::new(0.0, 0.0, 0.0), 0.0).unwrap();
+		{ // Add a collider
+			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+				&Vec3::zeros(),
+				1.0,
+				1.0,
+			))).unwrap();
+			system.link_collider(collider, Some(first)).unwrap();
+		}
+		{ // Set the velocity to y = +1
+			let mut temp = system.get_entity(first).unwrap();
+			temp.velocity.y = 1.0;
+			system.update_entity(first, temp).unwrap();
+		}
+		let dual = system.add_entity(&Vec3::new(2.0, 3.0, 0.0), 0.0).unwrap();
+		{ // Add two colliders
+			let left = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+				&Vec3::new(-2.0, 0.0, 0.0),
+				1.0,
+				1.0,
+			))).unwrap();
+			system.link_collider(left, Some(dual)).unwrap();
+			let right = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+				&Vec3::new(2.0, 0.0, 0.0),
+				1.0,
+				1.0,
+			))).unwrap();
+			system.link_collider(right, Some(dual)).unwrap();
+		}
+		system.step(2.0);
+		{
+			let temp = system.get_entity(first).unwrap();
+			println!("{:?}", temp);
+			// The accumulated error on the below is surprisingly high.
+			assert!((temp.position - Vec3::new(0.0, 1.0, 0.0)).magnitude() < 0.05);
+			assert!((temp.velocity - Vec3::new(0.0, 0.0, 0.0)).magnitude() < 0.05);
+		}
+		{
+			let temp = system.get_entity(dual).unwrap();
+			assert!(temp.velocity.dot(&Vec3::new(0.0, 1.0, 0.0)) > EPSILON);
+			assert!(temp.angular_velocity.dot(&Vec3::new(0.0, 0.0, -1.0)) > EPSILON);
+		}
+	}
+
+	// TODO: Only angular inertia into a collision.
+	// TODO? Check attaching a collider with mass after rotation has already begun -> verify doesn't look weird.
 }
