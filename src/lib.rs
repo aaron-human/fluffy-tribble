@@ -3,6 +3,7 @@ pub mod consts;
 pub mod types;
 mod range;
 
+mod orientation;
 mod entity;
 pub use entity::Entity;
 mod collider;

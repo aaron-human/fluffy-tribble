@@ -2,9 +2,8 @@ use std::collections::HashSet;
 
 use generational_arena::Arena;
 
-use crate::collider::InternalCollider;
-use crate::consts::EPSILON;
 use crate::types::{Vec3, Mat3, ColliderHandle};
+use crate::collider::InternalCollider;
 
 /// The internal representation of any physical object.
 /// This generally has NO data hiding to keep things simple.
@@ -23,10 +22,15 @@ pub struct InternalEntity {
 	/// The (cached) total mass (including all colliders).
 	total_mass : f32,
 	/// The (cached) relative center-of-mass (including all colliders).
-	/// This is RELATIVE to `position`.
-	center_of_mass : Vec3,
+	/// This is RELATIVE to `position`, and WITHIN the local space.
+	center_of_mass_offset : Vec3,
 	/// The (cached) moment-of-inertia tensor (including all colliders).
 	moment_of_inertia : Mat3,
+
+	/// The current rotation about the center of mass.
+	pub rotation : Vec3,
+	/// The current angular velocity about the center of mass.
+	pub angular_velocity : Vec3,
 }
 
 impl InternalEntity {
@@ -40,8 +44,11 @@ impl InternalEntity {
 
 			own_mass: mass,
 			total_mass: mass,
-			center_of_mass: position.clone(),
+			center_of_mass_offset: position.clone(),
 			moment_of_inertia: Mat3::zeros(),
+
+			rotation: Vec3::zeros(),
+			angular_velocity: Vec3::zeros(),
 		})
 	}
 
@@ -51,6 +58,8 @@ impl InternalEntity {
 		self.own_mass = source.own_mass;
 		self.position = source.position;
 		self.velocity = source.velocity;
+		self.rotation = source.rotation;
+		self.angular_velocity = source.angular_velocity;
 		Ok(())
 	}
 
@@ -58,20 +67,22 @@ impl InternalEntity {
 	pub fn recalculate(&mut self, colliders : &Arena<Box<dyn InternalCollider>>) {
 		// First find the center of mass.
 		self.total_mass = self.own_mass;
-		self.center_of_mass = Vec3::zeros();
+		self.center_of_mass_offset = Vec3::zeros();
 		for handle in self.colliders.iter() {
 			let collider = colliders.get(*handle).unwrap();
 			let collider_mass = collider.get_mass();
 			self.total_mass += collider_mass;
-			self.center_of_mass += (collider.get_center_of_mass() - self.position).scale(collider_mass);
+			self.center_of_mass_offset += collider.get_center_of_mass().scale(collider_mass);
 		}
-		self.center_of_mass /= self.total_mass;
+		self.center_of_mass_offset /= self.total_mass;
 
 		// Then find the moment of inertia relative to the center-of-mass.
 		self.moment_of_inertia = Mat3::zeros();
+		// TODO? Make changes in the moment of inertia rescale the angular velocity? Could calculate the energy before then rescale it to be the same after...
+		// TODO? Does the rotation angle need to change since the center-of-mass changed?
 		for handle in self.colliders.iter() {
 			let collider = colliders.get(*handle).unwrap();
-			let offset = collider.get_center_of_mass() - self.center_of_mass;
+			let offset = collider.get_center_of_mass() - self.center_of_mass_offset;
 			let translated_moment_of_inertia = collider.get_moment_of_inertia_tensor() +
 				collider.get_mass() * (Mat3::from_diagonal_element(offset.dot(&offset)) - offset * offset.transpose());
 			self.moment_of_inertia += translated_moment_of_inertia;
@@ -83,9 +94,9 @@ impl InternalEntity {
 		self.total_mass
 	}
 
-	/// Gets the center of mass (accounting for all colliders).
-	pub fn get_center_of_mass(&self) -> Vec3 {
-		self.center_of_mass
+	/// Gets the center of mass (accounting for all colliders), in LOCAL space.
+	pub fn get_center_of_mass_offset(&self) -> Vec3 {
+		self.center_of_mass_offset
 	}
 
 	/// Gets the moment of inertia tensor.
@@ -110,9 +121,14 @@ pub struct Entity {
 	/// Last known total mass (including colliders).
 	total_mass : f32,
 	/// Last known center of mass. This does NOT get pushed back to InternalEntity upon update().
-	center_of_mass : Vec3,
+	center_of_mass_offset : Vec3,
 	/// Last known moment of inertia tensor.
 	moment_of_inertia : Mat3,
+
+	/// The current rotation about the center of mass.
+	pub rotation : Vec3,
+	/// The current angular velocity about the center of mass.
+	pub angular_velocity : Vec3,
 }
 
 impl Entity {
@@ -125,8 +141,11 @@ impl Entity {
 			colliders: source.colliders.clone(),
 
 			total_mass: source.get_total_mass(),
-			center_of_mass: source.get_center_of_mass(),
+			center_of_mass_offset: source.get_center_of_mass_offset(),
 			moment_of_inertia: source.get_moment_of_inertia(),
+
+			rotation: source.rotation,
+			angular_velocity: source.angular_velocity,
 		}
 	}
 
@@ -139,7 +158,7 @@ impl Entity {
 	/// Gets the last known total mass of this entity.
 	pub fn get_last_total_mass(&self) -> f32 { self.total_mass }
 	/// Gets the last known center-of-mass of this entity.
-	pub fn get_last_center_of_mass(&self) -> Vec3 { self.center_of_mass }
+	pub fn get_last_center_of_mass_offset(&self) -> Vec3 { self.center_of_mass_offset }
 	/// Gets the last known moment-of-inertia tensor of this entity.
 	pub fn get_last_moment_of_inertia(&self) -> Mat3 { self.moment_of_inertia }
 }

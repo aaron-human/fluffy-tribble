@@ -2,15 +2,17 @@ use std::f32::INFINITY;
 use std::cell::RefCell;
 use std::borrow::BorrowMut;
 
+use nalgebra::{Point3};
 use generational_arena::Arena;
 
 use crate::consts::EPSILON;
-use crate::types::{Vec3, EntityHandle, ColliderHandle};
+use crate::types::{Vec3, Mat3, EntityHandle, ColliderHandle};
 use crate::entity::{InternalEntity, Entity};
 use crate::collider::{ColliderType, InternalCollider, Collider};
-use crate::sphere_collider::{InternalSphereCollider, SphereCollider};
+use crate::sphere_collider::{InternalSphereCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::collide;
+use crate::orientation::Orientation;
 
 /// The entire physics system.
 pub struct PhysicsSystem {
@@ -25,8 +27,12 @@ pub struct PhysicsSystem {
 struct EntityStepInfo {
 	/// The entity handle.
 	handle : EntityHandle,
-	/// The planned motion for the entity.
-	movement : Vec3,
+	/// The orientation of the entity at the start.
+	orientation : Orientation,
+	/// The planned linear motion for the entity.
+	linear_movement : Vec3,
+	/// The planned angular motion for the entity.
+	angular_movement : Vec3,
 }
 
 impl PhysicsSystem {
@@ -184,14 +190,30 @@ impl PhysicsSystem {
 
 	/// Moves the system forward by the given time step.
 	pub fn step(&mut self, dt : f32) {
+		println!("Step started");
 		// Go through all entities and perform integration.
 		let mut entity_info = Vec::with_capacity(self.entities.borrow().len());
 		for (handle, entity) in self.entities.borrow_mut().iter_mut() { // TODO: Optimize this.
 			let acceleration = Vec3::zeros(); // TODO: Calculate acceleration.
 			entity.velocity += acceleration.scale(dt);
+			let linear_movement = entity.velocity.scale(dt);
+
+			let torque = Vec3::zeros(); // TODO: Calculate torque.
+			let angular_movement = if let Some(inverse) = entity.get_moment_of_inertia().try_inverse() {
+				entity.angular_velocity += inverse * torque.scale(dt);
+				entity.angular_velocity.scale(dt)
+			} else {
+				Vec3::zeros()
+			};
+
 			entity_info.push(EntityStepInfo {
 				handle,
-				movement: entity.velocity.scale(dt),
+				orientation: Orientation::new(
+					&(entity.position + entity.get_center_of_mass_offset()),
+					&entity.rotation,
+					&(-entity.get_center_of_mass_offset()),
+				),
+				linear_movement, angular_movement,
 			});
 		}
 
@@ -209,15 +231,19 @@ impl PhysicsSystem {
 			let mut earliest_collision = None;
 			let mut earliest_collision_first_entity_handle = None;
 			let mut earliest_collision_second_entity_handle = None;
+			let mut earliest_collision_first_info_index = 0;
+			let mut earliest_collision_second_info_index = 0;
 			// Go through every unique pair of handles and deal with collisions.
-			for first_handle_index in 0..entity_info.len() {
+			for first_index in 0..entity_info.len() {
 				// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
 				// Will be "done" once no collisions left or run out of iterations.
 
 				// So start by finding the first collision in the allotted time.
-				let (lower_entity_infos, upper_entity_infos) = entity_info.split_at_mut(first_handle_index+1);
-				let first_entity_info = &mut lower_entity_infos[first_handle_index];
-				for second_entity_info in upper_entity_infos {
+				let (lower_entity_infos, upper_entity_infos) = entity_info.split_at_mut(first_index+1);
+				let first_entity_info = &mut lower_entity_infos[first_index];
+				for second_offset_index in 0..upper_entity_infos.len() {
+					let second_index = first_index + second_offset_index;
+					let second_entity_info = &upper_entity_infos[second_offset_index];
 					let mut entities = self.entities.borrow_mut();
 					let (first_option, second_option) = entities.get2_mut(first_entity_info.handle, second_entity_info.handle);
 					let first = first_option.unwrap();
@@ -228,24 +254,31 @@ impl PhysicsSystem {
 							let colliders = self.colliders.borrow();
 							let first_collider_box  = colliders.get(*first_collider_handle ).unwrap();
 							let second_collider_box = colliders.get(*second_collider_handle).unwrap();
+
+							let first_start_isometry = first_entity_info.orientation.into_world();
+							let first_end_isometry = first_entity_info.orientation.after_affected(
+								&first_entity_info.linear_movement, &first_entity_info.angular_movement
+							).into_world();
+
+							let second_start_isometry = second_entity_info.orientation.into_world();
+							let second_end_isometry = second_entity_info.orientation.after_affected(
+								&second_entity_info.linear_movement, &second_entity_info.angular_movement
+							).into_world();
+
 							let collision_option = collide(
 								first_collider_box,
-								&first.position,
-								&first_entity_info.movement,
+								&first_start_isometry,
+								&first_end_isometry,
 								second_collider_box,
-								&second.position,
-								&second_entity_info.movement,
+								&second_start_isometry,
+								&second_end_isometry,
 							);
 							if let Some(collision) = collision_option {
-								// If the objects are (already) moving away from the point of contact, then ignore the collision.
 								let time = collision.times.min();
-								let first_position  = first.position  + first_entity_info.movement  * time;
-								let second_position = second.position + second_entity_info.movement * time;
-								let first_collision_offset  = collision.position - first_position;
-								let second_collision_offset = collision.position - second_position;
-								let first_moving_away  = EPSILON > first_collision_offset.dot(  &first.velocity);
-								let second_moving_away = EPSILON > second_collision_offset.dot(&second.velocity);
-								if first_moving_away && second_moving_away {
+								// If the objects are (already) moving away from the point of contact, then ignore the collision.
+								let first_moving_away  = EPSILON > collision.normal.dot(&first.velocity);
+								let second_moving_away = EPSILON > collision.normal.dot(&-second.velocity);
+								if first_moving_away && second_moving_away { // TODO: May not need this?
 									continue;
 								}
 								// Otherwise check if this collision is the closest.
@@ -254,6 +287,8 @@ impl PhysicsSystem {
 									earliest_collision = Some(collision);
 									earliest_collision_first_entity_handle = Some(first_entity_info.handle);
 									earliest_collision_second_entity_handle = Some(second_entity_info.handle);
+									earliest_collision_first_info_index = first_index;
+									earliest_collision_second_info_index = second_index;
 								}
 							}
 						}
@@ -274,8 +309,22 @@ impl PhysicsSystem {
 				let (first_option, second_option) = entities.get2_mut(first_entity_handle, second_entity_handle);
 				let first = first_option.unwrap();
 				let second = second_option.unwrap();
-				// For now just linear with restitution.
-				-(1.0 + RESTITUTION) * (first.velocity - second.velocity).dot(&collision.normal) / (1.0 / first.get_total_mass() + 1.0 / second.get_total_mass())
+
+				let first_inverse_moment_of_inertia  = first.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
+				let second_inverse_moment_of_inertia = second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
+				let first_center_of_mass = entity_info[earliest_collision_first_info_index].orientation.into_world().transform_point(&Point3::from(first.get_center_of_mass_offset())).coords; // Center of mass in world-space.
+				let second_center_of_mass = entity_info[earliest_collision_second_info_index].orientation.into_world().transform_point(&Point3::from(second.get_center_of_mass_offset())).coords; // Center of mass in world-space.
+				let first_offset = collision.position - first_center_of_mass;
+				let second_offset = collision.position - second_center_of_mass;
+
+				let denom =
+					1.0 / first.get_total_mass() +
+					1.0 / second.get_total_mass() +
+					(
+						first_inverse_moment_of_inertia  * first_offset.cross( &collision.normal).cross(&first_offset) +
+						second_inverse_moment_of_inertia * second_offset.cross(&collision.normal).cross(&second_offset)
+					).dot(&collision.normal);
+				-(1.0 + RESTITUTION) * (first.velocity - second.velocity).dot(&collision.normal) / denom
 			};
 			let after_collision_percent = 1.0 - earliest_collision_percent;
 			let time_after_collision = time_left * after_collision_percent;
@@ -284,17 +333,29 @@ impl PhysicsSystem {
 			for info in &mut entity_info {
 				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
 				let entity = entities.get_mut(info.handle).unwrap();
-				entity.position += info.movement * earliest_collision_percent;
-				info.movement *= after_collision_percent;
+				info.orientation.position += info.linear_movement  * earliest_collision_percent;
+				info.orientation.rotation += info.angular_movement * earliest_collision_percent;
+				entity.position = info.orientation.local_origin_in_world();
+				entity.rotation = info.orientation.rotation;
+				info.linear_movement *= after_collision_percent;
+				info.angular_movement *= after_collision_percent;
 				// Then check if anything has to change.
 				if first_entity_handle == info.handle {
 					// Apply the impluse and re-integrate the movement.
 					entity.velocity += collision.normal.scale(impulse_magnitude / entity.get_total_mass());
-					info.movement = entity.velocity * time_after_collision;
+					info.linear_movement = entity.velocity * time_after_collision;
+
+					let center_of_mass = info.orientation.into_world().transform_point(&Point3::from(entity.get_center_of_mass_offset())).coords; // Center of mass in world-space.
+					entity.angular_velocity += entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					info.angular_movement = entity.angular_velocity * time_after_collision;
 				} else if second_entity_handle == info.handle {
 					// Apply the impulse and re-integrate the movement.
 					entity.velocity -= collision.normal.scale(impulse_magnitude / entity.get_total_mass());
-					info.movement = entity.velocity * time_after_collision;
+					info.linear_movement = entity.velocity * time_after_collision;
+
+					let center_of_mass = info.orientation.into_world().transform_point(&Point3::from(entity.get_center_of_mass_offset())).coords; // Center of mass in world-space.
+					entity.angular_velocity += entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					info.angular_movement = entity.angular_velocity * time_after_collision;
 				}
 			}
 			time_left = time_after_collision;
@@ -302,9 +363,12 @@ impl PhysicsSystem {
 
 		// Once all the physics has been handled, apply the reamining movement.
 		let mut entities = self.entities.borrow_mut();
-		for info in entity_info {
-			let first = entities.borrow_mut().get_mut(info.handle).unwrap();
-			first.position += info.movement;
+		for mut info in entity_info {
+			let entity = entities.borrow_mut().get_mut(info.handle).unwrap();
+			info.orientation.position += info.linear_movement;
+			info.orientation.rotation += info.angular_movement;
+			entity.position = info.orientation.local_origin_in_world();
+			entity.rotation = info.orientation.rotation;
 		}
 	} 
 }
@@ -312,6 +376,7 @@ impl PhysicsSystem {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::sphere_collider::SphereCollider;
 
 	/// Verify can create/store/remove entities.
 	#[test]
@@ -583,5 +648,44 @@ mod tests {
 		}
 	}
 
+	/// Check that angular velocity steps like I think it should.
+	#[test]
+	fn angular_update() {
+		let mut system = PhysicsSystem::new();
+		let first = system.add_entity(&Vec3::new(1.0, 1.0, 1.0), 0.0).unwrap();
+		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
+			&Vec3::zeros(),
+			1.0,
+			1.0,
+		))).unwrap();
+		system.link_collider(collider, Some(first)).unwrap();
+		{
+			let mut temp = system.get_entity(first).unwrap();
+			temp.angular_velocity.z = 1.0;
+			system.update_entity(first, temp).unwrap();
+		}
+		{
+			let temp = system.get_entity(first).unwrap();
+			assert!((temp.position - Vec3::new(1.0, 1.0, 1.0)).magnitude() < EPSILON);
+			assert!((temp.rotation - Vec3::new(0.0, 0.0, 0.0)).magnitude() < EPSILON);
+
+			let offset = temp.get_last_center_of_mass_offset();
+			assert!((offset - Vec3::new(0.0, 0.0, 0.0)).magnitude() < EPSILON);
+		}
+		system.step(1.0);
+		{
+			let temp = system.get_entity(first).unwrap();
+			assert!((temp.position - Vec3::new(1.0, 1.0, 1.0)).magnitude() < EPSILON);
+			assert!((temp.rotation - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
+		}
+		system.step(1.0);
+		{
+			let temp = system.get_entity(first).unwrap();
+			assert!((temp.position - Vec3::new(1.0, 1.0, 1.0)).magnitude() < EPSILON);
+			assert!((temp.rotation - Vec3::new(0.0, 0.0, 2.0)).magnitude() < EPSILON);
+		}
+	}
 	// TODO! Test moment of inertia/angular momentum!
+	// Only angular inertia into a collision.
+	// Check attaching a collider with mass after rotation has already begun -> verify doesn't look weird.
 }
