@@ -21,12 +21,15 @@ pub trait InternalCollider : Downcast + Debug {
 	fn get_entity(&mut self) -> Option<EntityHandle>;
 
 	/// Gets the center of mass for this collider in it's owning entity's local space.
-	fn get_center_of_mass(&self) -> Vec3;
+	fn get_local_center_of_mass(&self) -> Vec3;
 	/// Gets the mass of this collider. Must not be negative.
 	fn get_mass(&self) -> f32;
 	/// Gets the moment of inertia tensor about the center of mass.
 	/// This is oriented according to the owning entity's local space.
 	fn get_moment_of_inertia_tensor(&self) -> Mat3;
+
+	/// Gets the coefficient of restitution for this instance.
+	fn get_restitution_coefficient(&self) -> f32;
 }
 
 impl dyn InternalCollider {

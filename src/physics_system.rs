@@ -212,9 +212,6 @@ impl PhysicsSystem {
 		// TODO: Setup a broad-phase that checks AABBs.
 		// That should be able to split the world into islands of boxes that collide
 
-		const RESTITUTION : f32 = 1.0; // The current restitution coefficient.
-		// TODO: Will make the above based on object properties in the future!
-
 		let mut time_left = dt;
 		for _iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
@@ -224,6 +221,7 @@ impl PhysicsSystem {
 			// So start by going through every unique pair of handles and finding the first collision.
 			let mut earliest_collision_percent = 1.0; // Collisions must happen before 100% of time_left.
 			let mut earliest_collision = None;
+			let mut earliest_collision_restitution = 1.0;
 			let mut earliest_collision_first_entity_handle = None;
 			let mut earliest_collision_second_entity_handle = None;
 			let mut earliest_collision_first_info_index = 0;
@@ -276,6 +274,7 @@ impl PhysicsSystem {
 								if time < earliest_collision_percent {
 									earliest_collision_percent = time;
 									earliest_collision = Some(collision);
+									earliest_collision_restitution = first_collider_box.get_restitution_coefficient() *  second_collider_box.get_restitution_coefficient() ;
 									earliest_collision_first_entity_handle = Some(first_entity_info.handle);
 									earliest_collision_second_entity_handle = Some(second_entity_info.handle);
 									earliest_collision_first_info_index = first_index;
@@ -323,7 +322,7 @@ impl PhysicsSystem {
 				let first_total_velocity = first.velocity + first.angular_velocity.cross(&first_offset);
 				let second_total_velocity = second.velocity + second.angular_velocity.cross(&second_offset);
 
-				let numerator = -(1.0 + RESTITUTION) * (first_total_velocity - second_total_velocity).dot(&collision.normal);
+				let numerator = -(1.0 + earliest_collision_restitution) * (first_total_velocity - second_total_velocity).dot(&collision.normal);
 				let denominator =
 					1.0 / first.get_total_mass() +
 					1.0 / second.get_total_mass() +
@@ -419,6 +418,7 @@ mod tests {
 			&Vec3::new(0.0, 0.0, 1.0),
 			2.0,
 			1.0,
+			1.0,
 		))).unwrap();
 		if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
 			assert_eq!(interface.center.x, 0.0);
@@ -454,6 +454,7 @@ mod tests {
 		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 			&Vec3::new(0.0, 0.0, 1.0),
 			2.0,
+			1.0,
 			1.0,
 		))).unwrap();
 		{ // Entities start with no colliders. And colliders start with no entities.
@@ -502,6 +503,7 @@ mod tests {
 			let temp = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 				&Vec3::new(0.0, 0.0, 1.0),
 				2.0,
+				1.0,
 				1.0,
 			))).unwrap();
 			system.remove_collider(temp);
@@ -560,6 +562,7 @@ mod tests {
 			&Vec3::new(-1.0, 15.0, 8.0),
 			1.0,
 			1.0,
+			1.0,
 		))).unwrap();
 		system.link_collider(collider1, Some(entity)).unwrap();
 		{
@@ -576,6 +579,7 @@ mod tests {
 		}
 		let collider2 = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 			&Vec3::new(8.0, -1.0, 5.0),
+			1.0,
 			1.0,
 			1.0,
 		))).unwrap();
@@ -598,6 +602,7 @@ mod tests {
 				&Vec3::zeros(),
 				1.0,
 				1.0,
+				1.0,
 			))).unwrap();
 			system.link_collider(collider, Some(first)).unwrap();
 		}
@@ -610,6 +615,7 @@ mod tests {
 		{
 			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 				&Vec3::zeros(),
+				1.0,
 				1.0,
 				1.0,
 			))).unwrap();
@@ -644,6 +650,7 @@ mod tests {
 		}
 		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 			&Vec3::zeros(),
+			1.0,
 			1.0,
 			1.0,
 		))).unwrap();
@@ -691,6 +698,7 @@ mod tests {
 			&Vec3::zeros(),
 			1.0,
 			1.0,
+			1.0,
 		))).unwrap();
 		system.link_collider(collider, Some(first)).unwrap();
 		{
@@ -727,6 +735,7 @@ mod tests {
 				&Vec3::zeros(),
 				1.0,
 				1.0,
+				1.0,
 			))).unwrap();
 			system.link_collider(collider, Some(first)).unwrap();
 		}
@@ -741,10 +750,12 @@ mod tests {
 				&Vec3::new(-2.0, 0.0, 0.0),
 				1.0,
 				1.0,
+				1.0,
 			))).unwrap();
 			system.link_collider(left, Some(dual)).unwrap();
 			let right = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
 				&Vec3::new(2.0, 0.0, 0.0),
+				1.0,
 				1.0,
 				1.0,
 			))).unwrap();

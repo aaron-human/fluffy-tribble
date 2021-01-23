@@ -80,7 +80,7 @@ impl InternalEntity {
 			let collider = colliders.get(*handle).unwrap();
 			let collider_mass = collider.get_mass();
 			self.total_mass += collider_mass;
-			center_of_mass += self.orientation.position_into_world(&collider.get_center_of_mass()).scale(collider_mass);
+			center_of_mass += self.orientation.position_into_world(&collider.get_local_center_of_mass()).scale(collider_mass);
 		}
 		if self.total_mass < self.own_mass {
 			// If there are colliders with mass, then use them to decide where this entity's center-of-mass is.
@@ -104,7 +104,7 @@ impl InternalEntity {
 		// TODO? Do orientation.rotation and angular_velocity need to change since the center-of-mass changed?
 		for handle in self.colliders.iter() {
 			let collider = colliders.get(*handle).unwrap();
-			let offset = self.orientation.position_into_world(&collider.get_center_of_mass()) - self.orientation.position;
+			let offset = self.orientation.position_into_world(&collider.get_local_center_of_mass()) - self.orientation.position;
 			let translated_moment_of_inertia =
 				self.orientation.tensor_into_world(&collider.get_moment_of_inertia_tensor()) +
 				collider.get_mass() * (Mat3::from_diagonal_element(offset.dot(&offset)) - offset * offset.transpose());

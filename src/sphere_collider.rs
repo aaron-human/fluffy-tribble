@@ -15,11 +15,13 @@ pub struct InternalSphereCollider {
 	pub radius : f32,
 	/// The total mass. Must not be negative.
 	pub mass : f32,
+	/// The restituion coefficient.
+	pub restitution_coefficient : f32,
 }
 
 impl InternalSphereCollider {
 	/// Creates a new instance.
-	pub fn new(offset : &Vec3, radius : f32, mass : f32) -> Result<Box<dyn InternalCollider>, ()> {
+	pub fn new(offset : &Vec3, radius : f32, mass : f32, restitution_coefficient : f32) -> Result<Box<dyn InternalCollider>, ()> {
 		if CONTACT_MARGIN >= radius || 0.0 > mass {
 			Err(()) // TODO: An error type.
 		} else {
@@ -28,6 +30,7 @@ impl InternalSphereCollider {
 				center: offset.clone(),
 				radius,
 				mass,
+				restitution_coefficient,
 			}))
 		}
 	}
@@ -38,6 +41,7 @@ impl InternalSphereCollider {
 			&source.center,
 			source.radius,
 			source.mass,
+			source.restitution_coefficient,
 		)
 	}
 
@@ -76,7 +80,7 @@ impl InternalCollider for InternalSphereCollider {
 	/// Gets the center of mass for this collider.
 	/// This is relative to this collider's owning/linked/attached entity.
 	/// This IS NOT relative to this collider's "center" property.
-	fn get_center_of_mass(&self) -> Vec3 { self.center }
+	fn get_local_center_of_mass(&self) -> Vec3 { self.center }
 
 	/// Gets the mass of this collider. Must not be negative.
 	fn get_mass(&self) -> f32 { self.mass }
@@ -85,6 +89,10 @@ impl InternalCollider for InternalSphereCollider {
 	fn get_moment_of_inertia_tensor(&self) -> Mat3 {
 		let inertia = 2.0 / 5.0 * self.mass * self.radius;
 		Mat3::from_diagonal(&Vec3::new(inertia, inertia, inertia))
+	}
+
+	fn get_restitution_coefficient(&self) -> f32 {
+		self.restitution_coefficient
 	}
 }
 
@@ -100,12 +108,14 @@ pub struct SphereCollider {
 	pub radius : f32,
 	/// The total mass.
 	pub mass : f32,
+	/// The restituion coefficient.
+	pub restitution_coefficient : f32,
 }
 
 impl SphereCollider {
 	/// Creates an instance.
-	pub fn new(center : &Vec3, radius : f32, mass : f32) -> SphereCollider {
-		SphereCollider { entity: None, center: center.clone(), radius, mass }
+	pub fn new(center : &Vec3, radius : f32, mass : f32, restitution_coefficient : f32) -> SphereCollider {
+		SphereCollider { entity: None, center: center.clone(), radius, mass, restitution_coefficient, }
 	}
 
 	/// Creates from an InternalSphereCollider.
@@ -115,6 +125,7 @@ impl SphereCollider {
 			center: source.center.clone(),
 			radius: source.radius,
 			mass: source.mass,
+			restitution_coefficient: source.restitution_coefficient,
 		}
 	}
 }
