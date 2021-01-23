@@ -3,43 +3,44 @@ use nalgebra::{Translation3, Point3};
 
 use crate::types::{Vec3, Quat, Isometry};
 
-/// A structure for storing a set of heavily-related 3D items used for orientation.
+/// A structure for storing the frame-of-reference for the local space of an entity.
+/// Put another way, this is how to get from an enetity's local space to world space (and vise versa).
 #[derive(Copy, Clone, Debug)]
 pub struct Orientation {
 	/// The point all rotations are about.
-	/// The will usually be the center-of-mass for physical objects.
+	/// The will be the center-of-mass for entities.
 	/// This is stored in WORLD coordinates.
 	pub position : Vec3,
-	/// The current rotation that this object is at.
+	/// The current rotation that this reference frame.
+	/// This will be the rotation of the entity about it's center of mass.
 	rotation : Quat,
-	/// A special position that acts as the origin of the LOCAL space.
-	/// This offset is stored relative to 'position' (in LOCAL coordinates).
-	/// For physical objects, this is usually the entity's 'position'.
-	internal_origin : Vec3,
+	/// The origin of the LOCAL space.
+	/// For entities this is the vector from the center of mass to the entity's "position" in LOCAL space.
+	internal_origin_offset : Vec3,
 }
 
 impl Orientation {
 	/// Creates a new instance.
-	pub fn new(position : &Vec3, rotation : &Vec3, internal_origin : &Vec3) -> Orientation {
+	pub fn new(position : &Vec3, rotation : &Vec3, internal_origin_offset : &Vec3) -> Orientation {
 		Orientation {
 			position: position.clone(),
 			rotation: Quat::from_scaled_axis(*rotation),
-			internal_origin: internal_origin.clone(),
+			internal_origin_offset: internal_origin_offset.clone(),
 		}
 	}
 
-	/// Creates a matrix to get into local space from world space.
+	/// Creates a way to get into local space from world space.
 	pub fn into_local(&self) -> Isometry {
 		let mut transform = Isometry::from_parts(Translation3::from(-self.position), Quat::identity());
 		transform.append_rotation_mut(&self.rotation.inverse());
-		transform.append_translation_mut(&Translation3::from(-self.internal_origin));
+		transform.append_translation_mut(&Translation3::from(-self.internal_origin_offset));
 		transform
 	}
 
-	/// Creates a matrix to get to world space from local space.
+	/// Creates a way to get to world space from local space.
 	pub fn into_world(&self) -> Isometry {
 		let mut transform = self.into_local();
-		transform.inverse_mut();
+		transform.inverse_mut(); // TODO: Could slightly optimize. Inverse is probably an expensive function...
 		transform
 	}
 
@@ -48,23 +49,27 @@ impl Orientation {
 		self.into_world().transform_point(&Point3::from(*position)).coords
 	}
 
-	/// The local origin in world coordinates.
+	/// The local space's origin in world coordinates.
 	pub fn local_origin_in_world(&self) -> Vec3 {
 		self.position_into_world(&Vec3::zeros())
-	}
-
-	/// Creates an instance that is like this one after a rotation and translation has been applied.
-	pub fn after_affected(&self, linear_movement : &Vec3, angular_movement : &Vec3) -> Orientation {
-		Orientation {
-			position: self.position + linear_movement,
-			rotation: Quat::from_scaled_axis(*angular_movement) * self.rotation,
-			internal_origin: self.internal_origin,
-		}
 	}
 
 	/// Creates a axis-angle rotation vector describing the current rotation.
 	pub fn rotation_vec(&self) -> Vec3 {
 		self.rotation.scaled_axis()
+	}
+
+	/// Applies the given rotation and translation to this instance.
+	pub fn affect_with(&mut self, linear_movement : &Vec3, angular_movement : &Vec3) {
+		self.position += linear_movement;
+		self.rotation = Quat::from_scaled_axis(*angular_movement) * self.rotation;
+	}
+
+	/// Creates an instance that is like this one after a rotation and translation has been applied.
+	pub fn after_affected(&self, linear_movement : &Vec3, angular_movement : &Vec3) -> Orientation {
+		let mut copy = self.clone();
+		copy.affect_with(linear_movement, angular_movement);
+		copy
 	}
 }
 

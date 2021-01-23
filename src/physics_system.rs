@@ -307,7 +307,7 @@ impl PhysicsSystem {
 			for info in &mut entity_info {
 				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
 				let entity = entities.get_mut(info.handle).unwrap();
-				info.orientation = info.orientation.after_affected(
+				info.orientation.affect_with(
 					&(info.linear_movement  * earliest_collision_percent),
 					&(info.angular_movement * earliest_collision_percent),
 				);
