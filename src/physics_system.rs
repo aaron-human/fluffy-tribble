@@ -133,7 +133,6 @@ impl PhysicsSystem {
 			ColliderWrapper::Sphere(typed_source) => {
 				if let Some(typed_dest) = self.colliders.borrow_mut().get_mut(handle).and_then(|boxed| boxed.downcast_mut::<InternalSphereCollider>()) {
 					entity_handle_option = typed_dest.get_entity();
-					println!("entity_handle_option: {:?}", entity_handle_option);
 					typed_dest.update_from(&typed_source)
 				} else {
 					return Err(());
@@ -146,7 +145,6 @@ impl PhysicsSystem {
 			println!("unwrapped entity_handle_option");
 			if let Some(entity) = self.entities.borrow_mut().get_mut(entity_handle) {
 				entity.recalculate(&*self.colliders.borrow());
-				println!("recalculated!");
 			}
 		}
 		result
@@ -233,7 +231,7 @@ impl PhysicsSystem {
 		for _iteration in 0..self.iteration_max {
 			// TODO: Someday optimize so it keeps track of collisions, and only calculates new collisions if one of the associated bodies has been modified by the last iteration.
 
-			let mut earliest_collision_percent = INFINITY;
+			let mut earliest_collision_percent = 1.0; // Collisions must happen before 100% of time_left.
 			let mut earliest_collision = None;
 			let mut earliest_collision_first_entity_handle = None;
 			let mut earliest_collision_second_entity_handle = None;
@@ -302,13 +300,7 @@ impl PhysicsSystem {
 				}
 			}
 
-			// No collision means you're done.
-			if 1.0 < earliest_collision_percent {
-				println!("No collision found!");
-				break;
-			}
-
-			// Re-adjust all of the movements to account for time stepping forward and the collision.
+			// Re-adjust all of the movements to account for time stepping forward to just before (time_left * earliest_collision).
 			let mut entities = self.entities.borrow_mut();
 			let after_collision_percent = 1.0 - earliest_collision_percent;
 			let time_after_collision = time_left * after_collision_percent;
@@ -324,12 +316,10 @@ impl PhysicsSystem {
 				info.linear_movement *= after_collision_percent;
 				info.angular_movement *= after_collision_percent;
 			}
+			time_left = time_after_collision;
 
-			// Handle the collision.
-			//self.debug.push(first_entity_handle.into_raw_parts().0 as f32);
-			//self.debug.push(second_entity_handle.into_raw_parts().0 as f32);
-			{
-				let collision = earliest_collision.unwrap();
+			// Then respond to the collision.
+			if let Some(collision) = earliest_collision {
 				let first_entity_handle = earliest_collision_first_entity_handle.unwrap();
 				let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
 
@@ -388,8 +378,9 @@ impl PhysicsSystem {
 					second.angular_velocity -= second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
 					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
+			} else {
+				break; // No collision means done handling the entire step. So quit out of this loop.
 			}
-			time_left = time_after_collision;
 		}
 
 		// Once all the physics has been handled, apply the reamining movement.
