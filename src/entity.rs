@@ -21,11 +21,11 @@ pub struct InternalEntity {
 	/// This should only ever be udpated by calling recalculate_mass().
 	total_mass : f32,
 
-	/// The (cached) moment-of-inertia tensor (including all colliders).
+	/// The (cached) inverse of the moment-of-inertia tensor (including all colliders).
 	/// This is in WORLD space.
 	///
 	/// This should only ever be udpated by calling recalculate_mass().
-	moment_of_inertia : Mat3,
+	inverse_moment_of_inertia : Mat3,
 
 	/// The current linear velocity.
 	pub velocity : Vec3,
@@ -50,7 +50,7 @@ impl InternalEntity {
 
 			own_mass: mass,
 			total_mass: mass,
-			moment_of_inertia: Mat3::zeros(),
+			inverse_moment_of_inertia: Mat3::zeros(),
 
 			velocity: Vec3::zeros(),
 			angular_velocity: Vec3::zeros(),
@@ -100,7 +100,7 @@ impl InternalEntity {
 
 		// Then find the moment of inertia relative to the center-of-mass.
 		// Note that everything here is done in WORLD space not local.
-		self.moment_of_inertia = Mat3::zeros();
+		self.inverse_moment_of_inertia = Mat3::zeros();
 		// TODO? Do orientation.rotation and angular_velocity need to change since the center-of-mass changed?
 		for handle in self.colliders.iter() {
 			let collider = colliders.get(*handle).unwrap();
@@ -108,9 +108,9 @@ impl InternalEntity {
 			let translated_moment_of_inertia =
 				self.orientation.tensor_into_world(&collider.get_moment_of_inertia_tensor()) +
 				collider.get_mass() * (Mat3::from_diagonal_element(offset.dot(&offset)) - offset * offset.transpose());
-			self.moment_of_inertia += translated_moment_of_inertia;
+			self.inverse_moment_of_inertia += translated_moment_of_inertia;
 		}
-		// TODO: Just store the inverse moment of inertia tensor? Do I ever use the normal one?
+		self.inverse_moment_of_inertia.try_inverse_mut();
 	}
 
 	/// Gets the total mass of this entity and all of its colliders.
@@ -119,8 +119,8 @@ impl InternalEntity {
 	}
 
 	/// Gets the moment of inertia tensor in WORLD space.
-	pub fn get_moment_of_inertia(&self) -> Mat3 {
-		self.moment_of_inertia
+	pub fn get_inverse_moment_of_inertia(&self) -> Mat3 {
+		self.inverse_moment_of_inertia
 	}
 }
 

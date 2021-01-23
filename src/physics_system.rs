@@ -201,11 +201,9 @@ impl PhysicsSystem {
 			let linear_movement = entity.velocity.scale(dt);
 
 			let torque = Vec3::zeros(); // TODO: Calculate torque. Also fix how angular velocity is decided.
-			let angular_movement = if let Some(inverse) = entity.get_moment_of_inertia().try_inverse() {
-				entity.angular_velocity += inverse * torque.scale(dt); // TODO
+			let angular_movement = {
+				entity.angular_velocity += entity.get_inverse_moment_of_inertia() * torque.scale(dt); // TODO
 				entity.angular_velocity.scale(dt)
-			} else {
-				Vec3::zeros()
 			};
 
 			entity_info.push(EntityStepInfo { handle, linear_movement, angular_movement, });
@@ -317,12 +315,10 @@ impl PhysicsSystem {
 				let first = first_option.unwrap();
 				let second = second_option.unwrap();
 
-				let first_inverse_moment_of_inertia  = first.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
-				let second_inverse_moment_of_inertia = second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
-				let first_center_of_mass = first.orientation.position;
-				let second_center_of_mass = second.orientation.position;
-				let first_offset = collision.position - first_center_of_mass;
-				let second_offset = collision.position - second_center_of_mass;
+				let first_inverse_moment_of_inertia  = first.get_inverse_moment_of_inertia();
+				let second_inverse_moment_of_inertia = second.get_inverse_moment_of_inertia();
+				let first_offset = collision.position - first.orientation.position;
+				let second_offset = collision.position - second.orientation.position;
 
 				let first_total_velocity = first.velocity + first.angular_velocity.cross(&first_offset);
 				let second_total_velocity = second.velocity + second.angular_velocity.cross(&second_offset);
@@ -345,7 +341,7 @@ impl PhysicsSystem {
 					info.linear_movement = first.velocity * time_after_collision;
 
 					let center_of_mass = first.orientation.position; // Center of mass in world-space.
-					first.angular_velocity += first.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					first.angular_velocity += first.get_inverse_moment_of_inertia() * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
 					info.angular_movement = first.angular_velocity * time_after_collision;
 				}
 				{
@@ -356,7 +352,7 @@ impl PhysicsSystem {
 					info.linear_movement = second.velocity * time_after_collision;
 
 					let center_of_mass = second.orientation.position; // Center of mass in world-space.
-					second.angular_velocity -= second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					second.angular_velocity -= second.get_inverse_moment_of_inertia() * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
 					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
 			} else {
