@@ -248,7 +248,7 @@ impl PhysicsSystem {
 				let (lower_entity_infos, upper_entity_infos) = entity_info.split_at_mut(first_index+1);
 				let first_entity_info = &mut lower_entity_infos[first_index];
 				for second_offset_index in 0..upper_entity_infos.len() {
-					let second_index = first_index + second_offset_index;
+					let second_index = first_index + second_offset_index + 1;
 					let second_entity_info = &upper_entity_infos[second_offset_index];
 					let mut entities = self.entities.borrow_mut();
 					let (first_option, second_option) = entities.get2_mut(first_entity_info.handle, second_entity_info.handle);
@@ -285,7 +285,7 @@ impl PhysicsSystem {
 								let first_moving_away  = EPSILON > collision.normal.dot(&first.velocity);
 								let second_moving_away = EPSILON > collision.normal.dot(&-second.velocity);
 								if first_moving_away && second_moving_away { // TODO: May not need this?
-									//continue;
+									continue;
 								}
 								// Otherwise check if this collision is the closest.
 								if time < earliest_collision_percent {
@@ -304,21 +304,39 @@ impl PhysicsSystem {
 
 			// No collision means you're done.
 			if 1.0 < earliest_collision_percent {
+				println!("No collision found!");
 				break;
 			}
+
+			// Re-adjust all of the movements to account for time stepping forward and the collision.
+			let mut entities = self.entities.borrow_mut();
+			let after_collision_percent = 1.0 - earliest_collision_percent;
+			let time_after_collision = time_left * after_collision_percent;
+			for info in &mut entity_info {
+				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
+				let entity = entities.get_mut(info.handle).unwrap();
+				info.orientation = info.orientation.after_affected(
+					&(info.linear_movement  * earliest_collision_percent),
+					&(info.angular_movement * earliest_collision_percent),
+				);
+				entity.position = info.orientation.local_origin_in_world();
+				entity.rotation = info.orientation.rotation_vec();
+				info.linear_movement *= after_collision_percent;
+				info.angular_movement *= after_collision_percent;
+			}
+
 			// Handle the collision.
-			let collision = earliest_collision.unwrap();
-			let first_entity_handle = earliest_collision_first_entity_handle.unwrap();
-			let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
 			//self.debug.push(first_entity_handle.into_raw_parts().0 as f32);
 			//self.debug.push(second_entity_handle.into_raw_parts().0 as f32);
-			let impulse_magnitude = {
-				let mut entities = self.entities.borrow_mut();
+			{
+				let collision = earliest_collision.unwrap();
+				let first_entity_handle = earliest_collision_first_entity_handle.unwrap();
+				let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
+
 				let (first_option, second_option) = entities.get2_mut(first_entity_handle, second_entity_handle);
 				let first = first_option.unwrap();
 				let second = second_option.unwrap();
 
-				// TODO: Must calculate final rotation matrix then get moment of inertia! Otherwise the inertia will be slightly wrong.
 				let first_inverse_moment_of_inertia  = first.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
 				let second_inverse_moment_of_inertia = second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
 				let first_center_of_mass = entity_info[earliest_collision_first_info_index].orientation.position_into_world(&first.get_center_of_mass_offset()); // Center of mass in world-space.
@@ -339,43 +357,36 @@ impl PhysicsSystem {
 					).dot(&collision.normal);
 				//self.debug.extend_from_slice(first_inverse_moment_of_inertia.as_slice());
 				//self.debug.push(INFINITY);
-				self.debug.push(numerator);
-				self.debug.push(denominator);
-				numerator / denominator
-			};
-			let after_collision_percent = 1.0 - earliest_collision_percent;
-			let time_after_collision = time_left * after_collision_percent;
+				//self.debug.push(numerator);
+				//self.debug.push(denominator);
+				let impulse_magnitude = numerator / denominator;
+				println!("impulse_magnitude {:?}", impulse_magnitude);
+				println!("{}", earliest_collision_first_info_index);
+				println!("{}", earliest_collision_second_info_index);
 
-			// Re-adjust all of the movements to account for time stepping forward and the collision.
-			let mut entities = self.entities.borrow_mut();
-			for info in &mut entity_info {
-				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
-				let entity = entities.get_mut(info.handle).unwrap();
-				info.orientation = info.orientation.after_affected(
-					&(info.linear_movement  * earliest_collision_percent),
-					&(info.angular_movement * earliest_collision_percent),
-				);
-				entity.position = info.orientation.local_origin_in_world();
-				entity.rotation = info.orientation.rotation_vec();
-				info.linear_movement *= after_collision_percent;
-				info.angular_movement *= after_collision_percent;
-				// Then check if anything has to change.
-				if first_entity_handle == info.handle {
+				{
 					// Apply the impluse and re-integrate the movement.
-					entity.velocity += collision.normal.scale(impulse_magnitude / entity.get_total_mass());
-					info.linear_movement = entity.velocity * time_after_collision;
+					let info = &mut entity_info[earliest_collision_first_info_index];
 
-					let center_of_mass = info.orientation.position_into_world(&entity.get_center_of_mass_offset()); // Center of mass in world-space.
-					entity.angular_velocity += entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
-					info.angular_movement = entity.angular_velocity * time_after_collision;
-				} else if second_entity_handle == info.handle {
+					first.velocity += collision.normal.scale(impulse_magnitude / first.get_total_mass());
+					info.linear_movement = first.velocity * time_after_collision;
+					println!("{:?} info.linear_movement {:?}", info.handle, info.linear_movement);
+
+					let center_of_mass = info.orientation.position_into_world(&first.get_center_of_mass_offset()); // Center of mass in world-space.
+					first.angular_velocity += first.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					info.angular_movement = first.angular_velocity * time_after_collision;
+				}
+				{
 					// Apply the impulse and re-integrate the movement.
-					entity.velocity -= collision.normal.scale(impulse_magnitude / entity.get_total_mass());
-					info.linear_movement = entity.velocity * time_after_collision;
+					let info = &mut entity_info[earliest_collision_second_info_index];
 
-					let center_of_mass = info.orientation.position_into_world(&entity.get_center_of_mass_offset()); // Center of mass in world-space.
-					entity.angular_velocity -= entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
-					info.angular_movement = entity.angular_velocity * time_after_collision;
+					second.velocity -= collision.normal.scale(impulse_magnitude / second.get_total_mass());
+					info.linear_movement = second.velocity * time_after_collision;
+					println!("{:?} info.linear_movement {:?}", info.handle, info.linear_movement);
+
+					let center_of_mass = info.orientation.position_into_world(&second.get_center_of_mass_offset()); // Center of mass in world-space.
+					second.angular_velocity -= second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
 			}
 			time_left = time_after_collision;
@@ -385,6 +396,7 @@ impl PhysicsSystem {
 		let mut entities = self.entities.borrow_mut();
 		for info in entity_info {
 			let entity = entities.borrow_mut().get_mut(info.handle).unwrap();
+			println!("{} info.linear_movement {:?}", info.handle.into_raw_parts().0, info.linear_movement);
 			let final_orientation = info.orientation.after_affected(&info.linear_movement, &info.angular_movement);
 			entity.position = final_orientation.local_origin_in_world();
 			entity.rotation = final_orientation.rotation_vec();
