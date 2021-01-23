@@ -1,7 +1,7 @@
 
 use nalgebra::{Translation3, Point3};
 
-use crate::types::{Vec3, Quat, Isometry};
+use crate::types::{Vec3, Mat3, Quat, Isometry};
 
 /// A structure for storing the frame-of-reference for the local space of an entity.
 /// Put another way, this is how to get from an enetity's local space to world space (and vise versa).
@@ -10,13 +10,20 @@ pub struct Orientation {
 	/// The point all rotations are about.
 	/// The will be the center-of-mass for entities.
 	/// This is stored in WORLD coordinates.
+	///
+	/// Generally avoid changing this directly. It's better to use affect_with() and after_affected().
 	pub position : Vec3,
+
 	/// The current rotation that this reference frame.
 	/// This will be the rotation of the entity about it's center of mass.
-	rotation : Quat,
+	///
+	/// Generally should preferr using the affect_with() and after_affected() functions to apply changes.
+	pub rotation : Quat,
+
 	/// The origin of the LOCAL space.
 	/// For entities this is the vector from the center of mass to the entity's "position" in LOCAL space.
-	internal_origin_offset : Vec3,
+	/// This will generally never change unless an object's mass information changes.
+	pub internal_origin_offset : Vec3,
 }
 
 impl Orientation {
@@ -47,6 +54,25 @@ impl Orientation {
 	/// Converts a local position into world space.
 	pub fn position_into_world(&self, position : &Vec3) -> Vec3 {
 		self.into_world().transform_point(&Point3::from(*position)).coords
+	}
+
+	/// Converts a direction in world space into local space.
+	/// This means it applies the inverse of this orientation's rotation matrix to position.
+	pub fn direction_into_local(&self, direction : &Vec3) -> Vec3 {
+		self.into_local().transform_vector(direction)
+	}
+
+	/// Converts a direction in local space into world space.
+	/// This means it applies this orientation's rotation matrix to position.
+	pub fn direction_into_world(&self, direction : &Vec3) -> Vec3 {
+		self.into_world().transform_vector(direction)
+	}
+
+	/// Converts a tensor (like that for moment-of-inertia) in local space into world space.
+	/// This means it uses only this orientation's rotation (matrix) on the tensor.
+	pub fn tensor_into_world(&self, tensor : &Mat3) -> Mat3 {
+		let rotation = self.rotation.to_rotation_matrix();
+		rotation * tensor * rotation.transpose()
 	}
 
 	/// The local space's origin in world coordinates.
