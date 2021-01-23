@@ -1,18 +1,17 @@
-use std::f32::INFINITY;
 use std::cell::RefCell;
 use std::borrow::BorrowMut;
 
-use nalgebra::{Point3};
 use generational_arena::Arena;
 
 use crate::consts::EPSILON;
-use crate::types::{Vec3, Mat3, EntityHandle, ColliderHandle};
+use crate::types::{Vec3, EntityHandle, ColliderHandle};
 use crate::entity::{InternalEntity, Entity};
-use crate::collider::{ColliderType, InternalCollider, Collider};
+use crate::collider::{ColliderType, InternalCollider};
+#[allow(unused_imports)] // Need this trait, but Rust's warning system doesn't seem to understand that.
+use crate::collider::Collider;
 use crate::sphere_collider::{InternalSphereCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::collide;
-use crate::orientation::Orientation;
 
 /// The entire physics system.
 pub struct PhysicsSystem {
@@ -431,7 +430,7 @@ mod tests {
 		} else {
 			panic!("The collider didn't unwrap into the right type!");
 		}
-		if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
+		if let ColliderWrapper::Sphere(interface) = system.get_collider(id).unwrap() {
 			assert_eq!(interface.center.x, 5.0);
 			assert_eq!(interface.center.y, 0.0);
 			assert_eq!(interface.center.z, 1.0);

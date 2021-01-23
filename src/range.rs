@@ -49,11 +49,13 @@ impl Range {
 	}
 
 	/// The upper bound of the range. Will always be NaN if this range contains no values.
+	#[allow(dead_code)]
 	pub fn max(&self) -> f32 {
 		if self.is_empty() { NAN } else { self.max }
 	}
 
 	/// The size of this range.
+	#[allow(dead_code)]
 	pub fn size(&self) -> f32 {
 		if self.is_empty() { 0.0 } else { self.max - self.min }
 	}
@@ -69,6 +71,7 @@ impl Range {
 	}
 
 	/// Finds the range that contains both ranges.
+	#[allow(dead_code)]
 	pub fn contain(&self, other : &Range) -> Range {
 		if self.is_empty() { return *other; }
 		if other.is_empty() { return *self; }

@@ -1,4 +1,4 @@
-use crate::types::{Vec3, Isometry};
+use crate::types::{Vec3};
 use crate::range::Range;
 use crate::collider::{ColliderType, InternalCollider};
 use crate::sphere_collider::{InternalSphereCollider};

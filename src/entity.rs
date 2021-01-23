@@ -76,18 +76,20 @@ impl InternalEntity {
 		// First find the center of mass.
 		self.total_mass = self.own_mass;
 		let mut center_of_mass = Vec3::zeros();
+		let mut total_other_mass = 0.0;
 		for handle in self.colliders.iter() {
 			let collider = colliders.get(*handle).unwrap();
 			let collider_mass = collider.get_mass();
-			self.total_mass += collider_mass;
+			total_other_mass += collider_mass;
 			center_of_mass += self.orientation.position_into_world(&collider.get_local_center_of_mass()).scale(collider_mass);
 		}
-		if self.total_mass < self.own_mass {
+		if 0.0 < total_other_mass {
+			self.total_mass += total_other_mass;
 			// If there are colliders with mass, then use them to decide where this entity's center-of-mass is.
 			//
 			// Note that this entity's center of mass decides where it's own_mass is distributed. And that the center of mass calculation doesn't affix that mass to any point.
 			// SO the own_mass practically just teleports to where ever the center of mass moves to.
-			center_of_mass /= self.total_mass;
+			center_of_mass /= total_other_mass;
 			let center_of_mass_movement = center_of_mass - self.orientation.position; // How much the center of mass moves in world space.
 			self.orientation.internal_origin_offset -= self.orientation.direction_into_local(&center_of_mass_movement); // Keep the origin of the local space at the same position as the position of the local space moves.
 			self.orientation.position += center_of_mass_movement; // Then move the center-of-mass accordingly.
@@ -143,7 +145,10 @@ pub struct Entity {
 	/// All colliders that are attached/linked to this.
 	colliders : HashSet<ColliderHandle>,
 
-	/// The current mass that just this entity contributes (does NOT include colliders).
+	/// The current mass that just this entity contributes as a point-mass at the center of mass.
+	/// This does NOT include collider masses.
+	///
+	/// Note that this mass does NOT affect how the center of mass is decided. That's strictly a weighted sum with the colliders.
 	pub own_mass : f32,
 
 	/// The last known orientation. This is very much read-only.
