@@ -11,12 +11,11 @@ pub struct Orientation {
 	/// This is stored in WORLD coordinates.
 	pub position : Vec3,
 	/// The current rotation that this object is at.
-	/// This is in the olde rotation_axis * angle_in_radians notation.
-	pub rotation : Vec3,
+	rotation : Quat,
 	/// A special position that acts as the origin of the LOCAL space.
 	/// This offset is stored relative to 'position' (in LOCAL coordinates).
 	/// For physical objects, this is usually the entity's 'position'.
-	pub internal_origin : Vec3,
+	internal_origin : Vec3,
 }
 
 impl Orientation {
@@ -24,7 +23,7 @@ impl Orientation {
 	pub fn new(position : &Vec3, rotation : &Vec3, internal_origin : &Vec3) -> Orientation {
 		Orientation {
 			position: position.clone(),
-			rotation: rotation.clone(),
+			rotation: Quat::from_scaled_axis(*rotation),
 			internal_origin: internal_origin.clone(),
 		}
 	}
@@ -32,7 +31,7 @@ impl Orientation {
 	/// Creates a matrix to get into local space from world space.
 	pub fn into_local(&self) -> Isometry {
 		let mut transform = Isometry::from_parts(Translation3::from(-self.position), Quat::identity());
-		transform.append_rotation_mut(&Quat::from_scaled_axis(-self.rotation));
+		transform.append_rotation_mut(&self.rotation.inverse());
 		transform.append_translation_mut(&Translation3::from(-self.internal_origin));
 		transform
 	}
@@ -44,18 +43,28 @@ impl Orientation {
 		transform
 	}
 
+	/// Converts a local position into world space.
+	pub fn position_into_world(&self, position : &Vec3) -> Vec3 {
+		self.into_world().transform_point(&Point3::from(*position)).coords
+	}
+
 	/// The local origin in world coordinates.
 	pub fn local_origin_in_world(&self) -> Vec3 {
-		self.into_world().transform_point(&Point3::origin()).coords
+		self.position_into_world(&Vec3::zeros())
 	}
 
 	/// Creates an instance that is like this one after a rotation and translation has been applied.
 	pub fn after_affected(&self, linear_movement : &Vec3, angular_movement : &Vec3) -> Orientation {
-		Orientation::new(
-			&(self.position + linear_movement),
-			&(self.rotation + angular_movement),
-			&self.internal_origin,
-		)
+		Orientation {
+			position: self.position + linear_movement,
+			rotation: Quat::from_scaled_axis(*angular_movement) * self.rotation,
+			internal_origin: self.internal_origin,
+		}
+	}
+
+	/// Creates a axis-angle rotation vector describing the current rotation.
+	pub fn rotation_vec(&self) -> Vec3 {
+		self.rotation.scaled_axis()
 	}
 }
 
@@ -79,7 +88,7 @@ mod tests {
 			assert_eq!(transformed.y, 2.0);
 			assert_eq!(transformed.z, 1.0);
 		}
-		orientation.rotation += Vec3::z().scale(-PI / 2.0);
+		orientation = orientation.after_affected(&Vec3::zeros(), &Vec3::z().scale(-PI / 2.0));
 		{
 			let origin = orientation.local_origin_in_world();
 			assert!((origin.x - 3.0).abs() < EPSILON);

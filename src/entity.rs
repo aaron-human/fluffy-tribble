@@ -2,8 +2,9 @@ use std::collections::HashSet;
 
 use generational_arena::Arena;
 
-use crate::types::{Vec3, Mat3, ColliderHandle};
+use crate::types::{Vec3, Mat3, Quat, ColliderHandle};
 use crate::collider::InternalCollider;
+use crate::orientation::Orientation;
 
 /// The internal representation of any physical object.
 /// This generally has NO data hiding to keep things simple.
@@ -101,7 +102,8 @@ impl InternalEntity {
 
 	/// Gets the moment of inertia tensor.
 	pub fn get_moment_of_inertia(&self) -> Mat3 {
-		self.moment_of_inertia
+		let rotation = Quat::from_scaled_axis(self.rotation).to_rotation_matrix();
+		rotation * self.moment_of_inertia * rotation.transpose()
 	}
 }
 
@@ -161,4 +163,14 @@ impl Entity {
 	pub fn get_last_center_of_mass_offset(&self) -> Vec3 { self.center_of_mass_offset }
 	/// Gets the last known moment-of-inertia tensor of this entity.
 	pub fn get_last_moment_of_inertia(&self) -> Mat3 { self.moment_of_inertia }
+
+	/// Makes an orientation from the current settings.
+	/// This makes it easy to convert from local coordinates to global ones.
+	pub fn make_orientation(&self) -> Orientation {
+		Orientation::new(
+			&(self.position + self.center_of_mass_offset),
+			&self.rotation,
+			&(-self.center_of_mass_offset),
+		)
+	}
 }

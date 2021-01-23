@@ -2,6 +2,7 @@ use crate::types::{Vec3, Isometry};
 use crate::range::Range;
 use crate::collider::{ColliderType, InternalCollider};
 use crate::sphere_collider::{InternalSphereCollider};
+use crate::orientation::{Orientation};
 
 /// A structure for storing collision information.
 #[derive(Debug)]
@@ -19,17 +20,22 @@ impl Collision {
 }
 
 /// Tries to collide any two arbitrary colliders.
-pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Isometry, end1 : &Isometry, collider2 : &Box<dyn InternalCollider>, start2 : &Isometry, end2 : &Isometry) -> Option<Collision> {
+pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, end1 : &Orientation, collider2 : &Box<dyn InternalCollider>, start2 : &Orientation, end2 : &Orientation) -> Option<Collision> {
 	if ColliderType::SPHERE == collider1.get_type() && ColliderType::SPHERE == collider2.get_type() {
 		let col1 = collider1.downcast_ref::<InternalSphereCollider>().unwrap();
 		let col2 = collider2.downcast_ref::<InternalSphereCollider>().unwrap();
+
+		let col1_start_position = start1.position_into_world(&col1.center);
+		let col1_end_position = end1.position_into_world(&col1.center);
+		let col2_start_position = start2.position_into_world(&col2.center);
+		let col2_end_position = end2.position_into_world(&col2.center);
 		collide_sphere_with_sphere(
 			col1.radius,
-			&(col1.center + start1.translation.vector),
-			&(end1.translation.vector - start1.translation.vector),
+			&col1_start_position,
+			&(col1_end_position - col1_start_position),
 			col2.radius,
-			&(col2.center + start2.translation.vector),
-			&(end2.translation.vector - start2.translation.vector),
+			&col2_start_position,
+			&(col2_end_position - col2_start_position),
 		)
 	} else {
 		None

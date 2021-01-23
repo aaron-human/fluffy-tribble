@@ -22,6 +22,9 @@ pub struct PhysicsSystem {
 	colliders : RefCell<Arena<Box<dyn InternalCollider>>>,
 	/// The max number of physics iterations allowed per step.
 	pub iteration_max : u8,
+
+	/// A debugging value to get info out.
+	pub debug : Vec<f32>,
 }
 
 struct EntityStepInfo {
@@ -42,6 +45,8 @@ impl PhysicsSystem {
 			entities: RefCell::new(Arena::new()),
 			colliders : RefCell::new(Arena::new()),
 			iteration_max : 5,
+
+			debug: Vec::new(),
 		}
 	}
 
@@ -191,6 +196,7 @@ impl PhysicsSystem {
 	/// Moves the system forward by the given time step.
 	pub fn step(&mut self, dt : f32) {
 		println!("Step started");
+		self.debug.clear();
 		// Go through all entities and perform integration.
 		let mut entity_info = Vec::with_capacity(self.entities.borrow().len());
 		for (handle, entity) in self.entities.borrow_mut().iter_mut() { // TODO: Optimize this.
@@ -198,9 +204,9 @@ impl PhysicsSystem {
 			entity.velocity += acceleration.scale(dt);
 			let linear_movement = entity.velocity.scale(dt);
 
-			let torque = Vec3::zeros(); // TODO: Calculate torque.
+			let torque = Vec3::zeros(); // TODO: Calculate torque. Also fix how angular velocity is decided.
 			let angular_movement = if let Some(inverse) = entity.get_moment_of_inertia().try_inverse() {
-				entity.angular_velocity += inverse * torque.scale(dt);
+				entity.angular_velocity += inverse * torque.scale(dt); // TODO
 				entity.angular_velocity.scale(dt)
 			} else {
 				Vec3::zeros()
@@ -255,23 +261,23 @@ impl PhysicsSystem {
 							let first_collider_box  = colliders.get(*first_collider_handle ).unwrap();
 							let second_collider_box = colliders.get(*second_collider_handle).unwrap();
 
-							let first_start_isometry = first_entity_info.orientation.into_world();
-							let first_end_isometry = first_entity_info.orientation.after_affected(
+							let first_start_orientation = first_entity_info.orientation;
+							let first_end_orientation = first_entity_info.orientation.after_affected(
 								&first_entity_info.linear_movement, &first_entity_info.angular_movement
-							).into_world();
+							);
 
-							let second_start_isometry = second_entity_info.orientation.into_world();
-							let second_end_isometry = second_entity_info.orientation.after_affected(
+							let second_start_orientation = second_entity_info.orientation;
+							let second_end_orientation = second_entity_info.orientation.after_affected(
 								&second_entity_info.linear_movement, &second_entity_info.angular_movement
-							).into_world();
+							);
 
 							let collision_option = collide(
 								first_collider_box,
-								&first_start_isometry,
-								&first_end_isometry,
+								&first_start_orientation,
+								&first_end_orientation,
 								second_collider_box,
-								&second_start_isometry,
-								&second_end_isometry,
+								&second_start_orientation,
+								&second_end_orientation,
 							);
 							if let Some(collision) = collision_option {
 								let time = collision.times.min();
@@ -279,7 +285,7 @@ impl PhysicsSystem {
 								let first_moving_away  = EPSILON > collision.normal.dot(&first.velocity);
 								let second_moving_away = EPSILON > collision.normal.dot(&-second.velocity);
 								if first_moving_away && second_moving_away { // TODO: May not need this?
-									continue;
+									//continue;
 								}
 								// Otherwise check if this collision is the closest.
 								if time < earliest_collision_percent {
@@ -304,16 +310,19 @@ impl PhysicsSystem {
 			let collision = earliest_collision.unwrap();
 			let first_entity_handle = earliest_collision_first_entity_handle.unwrap();
 			let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
+			self.debug.push(first_entity_handle.into_raw_parts().0 as f32);
+			self.debug.push(second_entity_handle.into_raw_parts().0 as f32);
 			let impulse_magnitude = {
 				let mut entities = self.entities.borrow_mut();
 				let (first_option, second_option) = entities.get2_mut(first_entity_handle, second_entity_handle);
 				let first = first_option.unwrap();
 				let second = second_option.unwrap();
 
+				// TODO: Must calculate final rotation matrix then get moment of inertia! Otherwise the inertia will be slightly wrong.
 				let first_inverse_moment_of_inertia  = first.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
 				let second_inverse_moment_of_inertia = second.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros());
-				let first_center_of_mass = entity_info[earliest_collision_first_info_index].orientation.into_world().transform_point(&Point3::from(first.get_center_of_mass_offset())).coords; // Center of mass in world-space.
-				let second_center_of_mass = entity_info[earliest_collision_second_info_index].orientation.into_world().transform_point(&Point3::from(second.get_center_of_mass_offset())).coords; // Center of mass in world-space.
+				let first_center_of_mass = entity_info[earliest_collision_first_info_index].orientation.position_into_world(&first.get_center_of_mass_offset()); // Center of mass in world-space.
+				let second_center_of_mass = entity_info[earliest_collision_second_info_index].orientation.position_into_world(&second.get_center_of_mass_offset()); // Center of mass in world-space.
 				let first_offset = collision.position - first_center_of_mass;
 				let second_offset = collision.position - second_center_of_mass;
 
@@ -328,15 +337,18 @@ impl PhysicsSystem {
 			};
 			let after_collision_percent = 1.0 - earliest_collision_percent;
 			let time_after_collision = time_left * after_collision_percent;
+
 			// Re-adjust all of the movements to account for time stepping forward and the collision.
 			let mut entities = self.entities.borrow_mut();
 			for info in &mut entity_info {
 				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
 				let entity = entities.get_mut(info.handle).unwrap();
-				info.orientation.position += info.linear_movement  * earliest_collision_percent;
-				info.orientation.rotation += info.angular_movement * earliest_collision_percent;
+				info.orientation = info.orientation.after_affected(
+					&(info.linear_movement  * earliest_collision_percent),
+					&(info.angular_movement * earliest_collision_percent),
+				);
 				entity.position = info.orientation.local_origin_in_world();
-				entity.rotation = info.orientation.rotation;
+				entity.rotation = info.orientation.rotation_vec();
 				info.linear_movement *= after_collision_percent;
 				info.angular_movement *= after_collision_percent;
 				// Then check if anything has to change.
@@ -363,12 +375,11 @@ impl PhysicsSystem {
 
 		// Once all the physics has been handled, apply the reamining movement.
 		let mut entities = self.entities.borrow_mut();
-		for mut info in entity_info {
+		for info in entity_info {
 			let entity = entities.borrow_mut().get_mut(info.handle).unwrap();
-			info.orientation.position += info.linear_movement;
-			info.orientation.rotation += info.angular_movement;
-			entity.position = info.orientation.local_origin_in_world();
-			entity.rotation = info.orientation.rotation;
+			let final_orientation = info.orientation.after_affected(&info.linear_movement, &info.angular_movement);
+			entity.position = final_orientation.local_origin_in_world();
+			entity.rotation = final_orientation.rotation_vec();
 		}
 	} 
 }
