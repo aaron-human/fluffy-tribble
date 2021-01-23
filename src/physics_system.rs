@@ -310,8 +310,8 @@ impl PhysicsSystem {
 			let collision = earliest_collision.unwrap();
 			let first_entity_handle = earliest_collision_first_entity_handle.unwrap();
 			let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
-			self.debug.push(first_entity_handle.into_raw_parts().0 as f32);
-			self.debug.push(second_entity_handle.into_raw_parts().0 as f32);
+			//self.debug.push(first_entity_handle.into_raw_parts().0 as f32);
+			//self.debug.push(second_entity_handle.into_raw_parts().0 as f32);
 			let impulse_magnitude = {
 				let mut entities = self.entities.borrow_mut();
 				let (first_option, second_option) = entities.get2_mut(first_entity_handle, second_entity_handle);
@@ -326,14 +326,22 @@ impl PhysicsSystem {
 				let first_offset = collision.position - first_center_of_mass;
 				let second_offset = collision.position - second_center_of_mass;
 
-				let denom =
+				let first_total_velocity = first.velocity + first.angular_velocity.cross(&first_offset);
+				let second_total_velocity = second.velocity + second.angular_velocity.cross(&second_offset);
+
+				let numerator = -(1.0 + RESTITUTION) * (first_total_velocity - second_total_velocity).dot(&collision.normal);
+				let denominator =
 					1.0 / first.get_total_mass() +
 					1.0 / second.get_total_mass() +
 					(
 						first_inverse_moment_of_inertia  * first_offset.cross( &collision.normal).cross(&first_offset) +
 						second_inverse_moment_of_inertia * second_offset.cross(&collision.normal).cross(&second_offset)
 					).dot(&collision.normal);
-				-(1.0 + RESTITUTION) * (first.velocity - second.velocity).dot(&collision.normal) / denom
+				//self.debug.extend_from_slice(first_inverse_moment_of_inertia.as_slice());
+				//self.debug.push(INFINITY);
+				self.debug.push(numerator);
+				self.debug.push(denominator);
+				numerator / denominator
 			};
 			let after_collision_percent = 1.0 - earliest_collision_percent;
 			let time_after_collision = time_left * after_collision_percent;
@@ -357,7 +365,7 @@ impl PhysicsSystem {
 					entity.velocity += collision.normal.scale(impulse_magnitude / entity.get_total_mass());
 					info.linear_movement = entity.velocity * time_after_collision;
 
-					let center_of_mass = info.orientation.into_world().transform_point(&Point3::from(entity.get_center_of_mass_offset())).coords; // Center of mass in world-space.
+					let center_of_mass = info.orientation.position_into_world(&entity.get_center_of_mass_offset()); // Center of mass in world-space.
 					entity.angular_velocity += entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
 					info.angular_movement = entity.angular_velocity * time_after_collision;
 				} else if second_entity_handle == info.handle {
@@ -365,8 +373,8 @@ impl PhysicsSystem {
 					entity.velocity -= collision.normal.scale(impulse_magnitude / entity.get_total_mass());
 					info.linear_movement = entity.velocity * time_after_collision;
 
-					let center_of_mass = info.orientation.into_world().transform_point(&Point3::from(entity.get_center_of_mass_offset())).coords; // Center of mass in world-space.
-					entity.angular_velocity += entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
+					let center_of_mass = info.orientation.position_into_world(&entity.get_center_of_mass_offset()); // Center of mass in world-space.
+					entity.angular_velocity -= entity.get_moment_of_inertia().try_inverse().unwrap_or(Mat3::zeros()) * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
 					info.angular_movement = entity.angular_velocity * time_after_collision;
 				}
 			}

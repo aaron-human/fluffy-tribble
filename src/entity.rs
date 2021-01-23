@@ -100,7 +100,7 @@ impl InternalEntity {
 		self.center_of_mass_offset
 	}
 
-	/// Gets the moment of inertia tensor.
+	/// Gets the moment of inertia tensor in world space.
 	pub fn get_moment_of_inertia(&self) -> Mat3 {
 		let rotation = Quat::from_scaled_axis(self.rotation).to_rotation_matrix();
 		rotation * self.moment_of_inertia * rotation.transpose()
