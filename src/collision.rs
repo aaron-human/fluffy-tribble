@@ -21,6 +21,12 @@ impl Collision {
 
 /// Tries to collide any two arbitrary colliders.
 pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, end1 : &Orientation, collider2 : &Box<dyn InternalCollider>, start2 : &Orientation, end2 : &Orientation) -> Option<Collision> {
+	// Always ignore a NullCollider.
+	// This is redundant now, but won't be in the future.
+	if ColliderType::NULL == collider1.get_type() || ColliderType::NULL == collider2.get_type() {
+		return None
+	}
+
 	if ColliderType::SPHERE == collider1.get_type() && ColliderType::SPHERE == collider2.get_type() {
 		let col1 = collider1.downcast_ref::<InternalSphereCollider>().unwrap();
 		let col2 = collider2.downcast_ref::<InternalSphereCollider>().unwrap();

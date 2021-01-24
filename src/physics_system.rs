@@ -10,6 +10,7 @@ use crate::collider::{ColliderType, InternalCollider};
 #[allow(unused_imports)] // Need this trait, but Rust's warning system doesn't seem to understand that.
 use crate::collider::Collider;
 use crate::sphere_collider::{InternalSphereCollider};
+use crate::null_collider::{InternalNullCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::collide;
 
@@ -86,8 +87,16 @@ impl PhysicsSystem {
 	/// Adds a collider to a given entity.
 	pub fn add_collider(&mut self, source : ColliderWrapper) -> Result<ColliderHandle, ()> {
 		match source {
-			ColliderWrapper::Sphere(sphere) => {
-				match InternalSphereCollider::from(&sphere) {
+			ColliderWrapper::Null(source) => {
+				match InternalNullCollider::from(&source) {
+					Ok(internal) => {
+						Ok(self.colliders.borrow_mut().insert(internal))
+					},
+					Err(a) => Err(a)
+				}
+			}
+			ColliderWrapper::Sphere(source) => {
+				match InternalSphereCollider::from(&source) {
 					Ok(internal) => {
 						Ok(self.colliders.borrow_mut().insert(internal))
 					},
@@ -114,6 +123,9 @@ impl PhysicsSystem {
 	pub fn get_collider(&self, handle : ColliderHandle) -> Option<ColliderWrapper> {
 		if let Some(collider) = self.colliders.borrow().get(handle) {
 			match collider.get_type() {
+				ColliderType::NULL => {
+					Some(ColliderWrapper::Null(collider.downcast_ref::<InternalNullCollider>().unwrap().make_pub()))
+				}
 				ColliderType::SPHERE => {
 					Some(ColliderWrapper::Sphere(collider.downcast_ref::<InternalSphereCollider>().unwrap().make_pub()))
 				}
@@ -125,11 +137,24 @@ impl PhysicsSystem {
 	/// These values are all copies of the internal collider.
 	/// This does NOT update the list of linked/attached colliders. Must use link_collider() for that.
 	pub fn update_collider(&mut self, handle : ColliderHandle, source : ColliderWrapper) -> Result<(), ()> {
-		let entity_handle_option;
+		let mut colliders = self.colliders.borrow_mut();
+		let collider;
+		if let Some(collider_) = colliders.get_mut(handle) {
+			collider = collider_;
+		} else {
+			return Err(());
+		}
+		let entity_handle_option = collider.get_entity();
 		let result = match source {
+			ColliderWrapper::Null(typed_source) => {
+				if let Some(typed_dest) = collider.downcast_mut::<InternalNullCollider>() {
+					typed_dest.update_from(&typed_source)
+				} else {
+					return Err(());
+				}
+			}
 			ColliderWrapper::Sphere(typed_source) => {
-				if let Some(typed_dest) = self.colliders.borrow_mut().get_mut(handle).and_then(|boxed| boxed.downcast_mut::<InternalSphereCollider>()) {
-					entity_handle_option = typed_dest.get_entity();
+				if let Some(typed_dest) = collider.downcast_mut::<InternalSphereCollider>() {
 					typed_dest.update_from(&typed_source)
 				} else {
 					return Err(());
@@ -137,11 +162,9 @@ impl PhysicsSystem {
 			}
 		};
 		// Then, because mass might've changed, try to update the associated entity (if it exists).
-		println!("entity_handle_option: {:?}", entity_handle_option);
 		if let Some(entity_handle) = entity_handle_option {
-			println!("unwrapped entity_handle_option");
 			if let Some(entity) = self.entities.borrow_mut().get_mut(entity_handle) {
-				entity.recalculate_mass(&*self.colliders.borrow());
+				entity.recalculate_mass(&*colliders);
 			}
 		}
 		result
@@ -363,7 +386,9 @@ impl PhysicsSystem {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::types::Mat3;
 	use crate::sphere_collider::SphereCollider;
+	use crate::null_collider::NullCollider;
 
 	/// Verify can create/store/remove entities.
 	#[test]
@@ -588,6 +613,33 @@ mod tests {
 			let interface = system.get_entity(entity).unwrap();
 			let origin = interface.get_last_orientation().local_origin_in_world();
 			assert!((origin - Vec3::new(1.0, 2.0, 3.0)).magnitude() < EPSILON);
+		}
+	}
+
+	/// Verify can create a NullCollider and it can move the center of mass.
+	#[test]
+	fn link_null_collider() {
+		let mut system = PhysicsSystem::new();
+		let entity = system.add_entity(&Vec3::new(-1.0, -1.0, -1.0), 1.0).unwrap();
+		{
+			let interface = system.get_entity(entity).unwrap();
+			assert!((interface.position - Vec3::new(-1.0, -1.0, -1.0)).magnitude() < EPSILON);
+		}
+		let collider = system.add_collider(ColliderWrapper::Null(NullCollider::new(
+			&Vec3::new(2.0, 2.0, 2.0),
+			1.0,
+			Mat3::zeros(),
+		))).unwrap();
+		system.link_collider(collider, Some(entity)).unwrap();
+		{
+			let interface = system.get_entity(entity).unwrap();
+			assert!((interface.position - Vec3::new(1.0, 1.0, 1.0)).magnitude() < EPSILON);
+		}
+		system.step(1.0); // Make sure nothing panics with the collider.
+		system.link_collider(collider, None).unwrap();
+		{
+			let interface = system.get_entity(entity).unwrap();
+			assert!((interface.position - Vec3::new(-1.0, -1.0, -1.0)).magnitude() < EPSILON);
 		}
 	}
 

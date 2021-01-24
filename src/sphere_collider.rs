@@ -35,7 +35,7 @@ impl InternalSphereCollider {
 		}
 	}
 
-	/// Creates from a public interface for Entity.
+	/// Creates from a new instance from a given SphereCollider.
 	pub fn from(source : &SphereCollider) -> Result<Box<dyn InternalCollider>, ()> {
 		InternalSphereCollider::new(
 			&source.center,
