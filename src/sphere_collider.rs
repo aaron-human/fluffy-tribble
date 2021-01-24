@@ -96,8 +96,7 @@ impl InternalCollider for InternalSphereCollider {
 	}
 }
 
-/// The public face of a sphere collider.
-/// This is what users will interact with.
+/// A copy of all of the publicly-accessible properties of a spherical collider.
 #[derive(Debug)]
 pub struct SphereCollider {
 	/// The entity, if there is one.

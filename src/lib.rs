@@ -1,6 +1,7 @@
 
-pub mod consts;
-pub mod types;
+mod consts;
+mod types;
+pub use types::{EntityHandle, ColliderHandle};
 mod range;
 
 pub mod orientation;
@@ -10,7 +11,9 @@ mod collider;
 pub use collider::Collider;
 mod sphere_collider;
 pub use sphere_collider::SphereCollider;
-pub mod collider_wrapper;
+mod collider_wrapper;
+pub use collider_wrapper::ColliderWrapper;
 mod collision;
 
-pub mod physics_system;
+mod physics_system;
+pub use physics_system::PhysicsSystem;

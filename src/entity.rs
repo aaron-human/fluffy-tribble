@@ -58,6 +58,24 @@ impl InternalEntity {
 		})
 	}
 
+	/// Creates the public interface for this instance.
+	pub fn make_pub(&self) -> Entity {
+		Entity {
+			position: self.orientation.position.clone(),
+			rotation: self.orientation.rotation_vec(),
+
+			last_orientation: self.orientation.clone(),
+
+			own_mass: self.own_mass,
+			last_total_mass: self.get_total_mass(),
+
+			velocity: self.velocity.clone(),
+			angular_velocity: self.angular_velocity,
+
+			colliders: self.colliders.clone(),
+		}
+	}
+
 	/// Updates from the passed in Entity object.
 	pub fn update_from(&mut self, source : Entity) -> Result<(),()> {
 		if 0.0 > source.own_mass { return Err(()); }
@@ -126,8 +144,7 @@ impl InternalEntity {
 	}
 }
 
-/// The public face of any physical object.
-/// This is what users will interact with.
+/// A copy of all of the publicly-accessible properties of a physical object in the world.
 #[derive(Debug)]
 pub struct Entity {
 	/// The current position of the center of mass in WORLD space.
@@ -146,6 +163,7 @@ pub struct Entity {
 	colliders : HashSet<ColliderHandle>,
 
 	/// The current mass that just this entity contributes as a point-mass at the center of mass.
+	///
 	/// This does NOT include collider masses.
 	///
 	/// Note that this mass does NOT affect how the center of mass is decided. That's strictly a weighted sum with the colliders.
@@ -159,26 +177,9 @@ pub struct Entity {
 }
 
 impl Entity {
-	/// Creates from an InternalEntity.
-	pub fn from(source : &InternalEntity) -> Entity {
-		Entity {
-			position: source.orientation.position.clone(),
-			rotation: source.orientation.rotation_vec(),
-
-			last_orientation: source.orientation.clone(),
-
-			own_mass: source.own_mass,
-			last_total_mass: source.get_total_mass(),
-
-			velocity: source.velocity.clone(),
-			angular_velocity: source.angular_velocity,
-
-			colliders: source.colliders.clone(),
-		}
-	}
-
 	/// Gets all collider handles.
-	/// Notibly this is just the getter, as this object cannot be used to modify what colliders are attached to this entity.
+	///
+	/// Notibly this is just the getter, as this object cannot be used to modify what colliders are attached to this entity (must use `link_collider()` for that).
 	pub fn get_colliders(&self) -> HashSet<ColliderHandle> {
 		self.colliders.clone()
 	}
@@ -187,6 +188,7 @@ impl Entity {
 	pub fn get_last_total_mass(&self) -> f32 { self.last_total_mass }
 
 	/// Gets the last orientation used by the entity.
+	///
 	/// This makes it easy to convert from local coordinates to global ones.
 	pub fn get_last_orientation<'a>(&'a self) -> &'a Orientation {
 		&self.last_orientation

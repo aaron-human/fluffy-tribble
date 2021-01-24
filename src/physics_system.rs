@@ -69,7 +69,7 @@ impl PhysicsSystem {
 	/// Gets an entity's public interface.
 	/// These values are all copies of the internal entity.
 	pub fn get_entity(&self, handle : EntityHandle) -> Option<Entity> {
-		self.entities.borrow().get(handle).and_then(|internal| Some(Entity::from(internal)))
+		self.entities.borrow().get(handle).and_then(|internal| Some(internal.make_pub()))
 	}
 
 	/// Updates an entity with the given values.
