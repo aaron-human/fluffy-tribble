@@ -4,9 +4,10 @@ use downcast_rs::{Downcast, impl_downcast};
 
 use crate::types::{Vec3, Mat3, EntityHandle};
 
-/// All the types of colliders.
+/// A way to quickly determine collider type.
 #[derive(PartialEq, Eq)]
 pub enum ColliderType {
+	/// For the [crate::SphereCollider].
 	SPHERE,
 }
 
@@ -44,10 +45,10 @@ pub trait Collider : Downcast + Debug {
 	fn get_type(&self) -> ColliderType;
 
 	/// Gets the entity this is linked to (if there is one).
+	///
 	/// This is read-only. To link things together, use PhysicsSystem.link_collider().
 	fn get_entity(&self) -> Option<EntityHandle>;
 
-	/// Gets the center of mass for this collider.
 	/// Gets the center of mass for this collider in it's owning entity's local space.
 	fn get_center_of_mass(&self) -> Vec3;
 }

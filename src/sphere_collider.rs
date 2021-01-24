@@ -35,7 +35,7 @@ impl InternalSphereCollider {
 		}
 	}
 
-	/// Creates from an InternalEntity.
+	/// Creates from a public interface for Entity.
 	pub fn from(source : &SphereCollider) -> Result<Box<dyn InternalCollider>, ()> {
 		InternalSphereCollider::new(
 			&source.center,
@@ -47,7 +47,13 @@ impl InternalSphereCollider {
 
 	/// Makes a SphereCollider copying this instance's values.
 	pub fn make_pub(&self) -> SphereCollider {
-		SphereCollider::from(self)
+		SphereCollider {
+			entity: self.entity.clone(),
+			center: self.center.clone(),
+			radius: self.radius,
+			mass: self.mass,
+			restitution_coefficient: self.restitution_coefficient,
+		}
 	}
 
 	/// Updates from the passed in Entity object.
@@ -115,17 +121,6 @@ impl SphereCollider {
 	/// Creates an instance.
 	pub fn new(center : &Vec3, radius : f32, mass : f32, restitution_coefficient : f32) -> SphereCollider {
 		SphereCollider { entity: None, center: center.clone(), radius, mass, restitution_coefficient, }
-	}
-
-	/// Creates from an InternalSphereCollider.
-	pub fn from(source : &InternalSphereCollider) -> SphereCollider {
-		SphereCollider {
-			entity: source.entity.clone(),
-			center: source.center.clone(),
-			radius: source.radius,
-			mass: source.mass,
-			restitution_coefficient: source.restitution_coefficient,
-		}
 	}
 }
 

@@ -8,7 +8,7 @@ pub mod orientation;
 mod entity;
 pub use entity::Entity;
 mod collider;
-pub use collider::Collider;
+pub use collider::{Collider, ColliderType};
 mod sphere_collider;
 pub use sphere_collider::SphereCollider;
 mod collider_wrapper;
