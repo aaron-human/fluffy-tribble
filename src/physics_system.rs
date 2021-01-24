@@ -309,6 +309,7 @@ impl PhysicsSystem {
 								let first_moving_away  = EPSILON > collision.normal.dot(&first.velocity);
 								let second_moving_away = EPSILON > collision.normal.dot(&-second.velocity);
 								if first_moving_away && second_moving_away { // TODO: May not need this?
+									println!("Dropping collision!");
 									continue;
 								}
 								// Otherwise check if this collision is the closest.
@@ -402,6 +403,7 @@ impl PhysicsSystem {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::f32::INFINITY;
 	use crate::null_collider::NullCollider;
 	use crate::sphere_collider::SphereCollider;
 	use crate::plane_collider::PlaneCollider;
@@ -916,6 +918,46 @@ mod tests {
 		}
 	}
 
-	// TODO: Only angular inertia into a collision.
+	/// Verify the plane collider with zero restitution will stop a sphere.
+	#[test]
+	fn floor_stop() {
+		let mut system = PhysicsSystem::new();
+		let ball = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(0.0, 0.0, 2.0);
+			entity.velocity = Vec3::new(0.0, 0.0, 2.0);
+			let entity_handle = system.add_entity(entity).unwrap();
+			let mut sphere = SphereCollider::new(1.0);
+			sphere.mass = 1.0;
+			let sphere_handle = system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap();
+			system.link_collider(sphere_handle, Some(entity_handle)).unwrap();
+			entity_handle
+		};
+		let wall = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(-1.0, 8.0, 4.0);
+			let entity_handle = system.add_entity(entity).unwrap();
+			let mut plane = PlaneCollider::new();
+			plane.normal = -Vec3::z();
+			plane.restitution_coefficient = 0.0;
+			plane.mass = INFINITY;
+			let plane_handle = system.add_collider(ColliderWrapper::Plane(plane)).unwrap();
+			system.link_collider(plane_handle, Some(entity_handle)).unwrap();
+			entity_handle
+		};
+		system.step(1.0);
+		{
+			let entity = system.get_entity(ball).unwrap();
+			assert!((entity.position - Vec3::new(0.0, 0.0, 3.0)).magnitude() < EPSILON);
+			assert!((entity.velocity - Vec3::new(0.0, 0.0, 0.0)).magnitude() < EPSILON);
+		}
+		{
+			let entity = system.get_entity(wall).unwrap();
+			assert!((entity.position - Vec3::new(-1.0, 8.0, 4.0)).magnitude() < EPSILON);
+			assert!((entity.velocity - Vec3::new(0.0, 0.0, 0.0)).magnitude() < EPSILON);
+		}
+	}
+
+	// TODO? Only angular inertia into a collision.
 	// TODO? Check attaching a collider with mass after rotation has already begun -> verify doesn't look weird.
 }

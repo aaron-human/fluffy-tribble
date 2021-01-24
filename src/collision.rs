@@ -1,7 +1,9 @@
+use crate::consts::EPSILON;
 use crate::types::{Vec3};
 use crate::range::Range;
 use crate::collider::{ColliderType, InternalCollider};
 use crate::sphere_collider::{InternalSphereCollider};
+use crate::plane_collider::{InternalPlaneCollider};
 use crate::orientation::{Orientation};
 
 /// A structure for storing collision information.
@@ -35,16 +37,99 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 		let col1_end_position = end1.position_into_world(&col1.center);
 		let col2_start_position = start2.position_into_world(&col2.center);
 		let col2_end_position = end2.position_into_world(&col2.center);
-		collide_sphere_with_sphere(
+
+		return collide_sphere_with_sphere(
 			col1.radius,
 			&col1_start_position,
 			&(col1_end_position - col1_start_position),
 			col2.radius,
 			&col2_start_position,
 			&(col2_end_position - col2_start_position),
-		)
+		);
+	}
+
+	if ColliderType::SPHERE == collider1.get_type() && ColliderType::PLANE == collider2.get_type() {
+		let sphere = collider1.downcast_ref::<InternalSphereCollider>().unwrap();
+		let plane  = collider2.downcast_ref::<InternalPlaneCollider>().unwrap();
+
+		let sphere_start_position = start1.position_into_world(&sphere.center);
+		let sphere_end_position = end1.position_into_world(&sphere.center);
+		let plane_start_position = start2.position_into_world(&plane.position);
+		let plane_end_position = end2.position_into_world(&plane.position);
+
+		return collide_sphere_with_plane(
+			sphere.radius,
+			&sphere_start_position,
+			&(sphere_end_position - sphere_start_position),
+			&plane_start_position,
+			&plane.normal,
+			&(plane_end_position - plane_start_position)
+		);
+	}
+	if ColliderType::PLANE == collider1.get_type() && ColliderType::SPHERE == collider2.get_type() {
+		let plane  = collider1.downcast_ref::<InternalPlaneCollider>().unwrap();
+		let sphere = collider2.downcast_ref::<InternalSphereCollider>().unwrap();
+
+		let sphere_start_position = start1.position_into_world(&sphere.center);
+		let sphere_end_position = end1.position_into_world(&sphere.center);
+		let plane_start_position = start2.position_into_world(&plane.position);
+		let plane_end_position = end2.position_into_world(&plane.position);
+
+		let collision_option = collide_sphere_with_plane(
+			sphere.radius,
+			&sphere_start_position,
+			&(sphere_end_position - sphere_start_position),
+			&plane_start_position,
+			&plane.normal,
+			&(plane_end_position - plane_start_position)
+		);
+		// Must negate the normal as the sphere is the first collider.
+		if let Some(mut collision) = collision_option {
+			collision.normal *= -1.0;
+			return Some(collision);
+		} else {
+			return None
+		}
+	}
+	// I don't think it makes sense to detect when two planes are colliding...
+
+	None
+}
+
+/// Collide a sphere with an inifinite plane.
+pub fn collide_sphere_with_plane(radius1 : f32, center1 : &Vec3, movement1 : &Vec3, position2 : &Vec3, normal2 : &Vec3, movement2 : &Vec3) -> Option<Collision> {
+	let start_farthest = center1 + normal2.scale(-radius1);
+	let start_along = start_farthest.dot(&normal2);
+	let end_farthest = start_farthest + movement1;
+	let end_along   = end_farthest.dot(&normal2);
+
+	let minimal_along = position2.dot(&normal2);
+	let plane_along = (position2 + movement2).dot(&normal2);
+
+	let start = start_along - minimal_along;
+	let delta = (plane_along - minimal_along) - (end_along - start_along);
+
+	if delta.abs() < EPSILON {
+		if start_along < minimal_along {
+			Some(Collision {
+				times: Range::single(0.0),
+				position: start_farthest,
+				normal: -normal2,
+			})
+		} else {
+			None
+		}
 	} else {
-		None
+		let time = start / delta;
+		if time < 1.0 {
+			Some(Collision {
+				times: Range::single(time),
+				position: start_farthest + (end_farthest - start_farthest).scale(time),
+				normal: -normal2,
+			})
+		} else {
+			None
+		}
 	}
 }
 

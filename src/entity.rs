@@ -1,3 +1,4 @@
+use std::f32::INFINITY;
 use std::collections::HashSet;
 
 use generational_arena::Arena;
@@ -91,13 +92,19 @@ impl InternalEntity {
 		self.total_mass = self.own_mass;
 		let mut center_of_mass = Vec3::zeros();
 		let mut total_other_mass = 0.0;
+		let mut found_infinite = false;
 		for handle in self.colliders.iter() {
 			let collider = colliders.get(*handle).unwrap();
 			let collider_mass = collider.get_mass();
+			if collider_mass.is_infinite() {
+				found_infinite = true;
+				break;
+			}
 			total_other_mass += collider_mass;
 			center_of_mass += self.orientation.position_into_world(&collider.get_local_center_of_mass()).scale(collider_mass);
 		}
-		if 0.0 < total_other_mass {
+		if found_infinite { self.total_mass = INFINITY; }
+		if 0.0 < total_other_mass && !found_infinite {
 			self.total_mass += total_other_mass;
 			// If there are colliders with mass, then use them to decide where this entity's center-of-mass is.
 			//
@@ -117,16 +124,18 @@ impl InternalEntity {
 		// Then find the moment of inertia relative to the center-of-mass.
 		// Note that everything here is done in WORLD space not local.
 		self.inverse_moment_of_inertia = Mat3::zeros();
-		// TODO? Do orientation.rotation and angular_velocity need to change since the center-of-mass changed?
-		for handle in self.colliders.iter() {
-			let collider = colliders.get(*handle).unwrap();
-			let offset = self.orientation.position_into_world(&collider.get_local_center_of_mass()) - self.orientation.position;
-			let translated_moment_of_inertia =
-				self.orientation.tensor_into_world(&collider.get_moment_of_inertia_tensor()) +
-				collider.get_mass() * (Mat3::from_diagonal_element(offset.dot(&offset)) - offset * offset.transpose());
-			self.inverse_moment_of_inertia += translated_moment_of_inertia;
+		if !found_infinite {
+			// TODO? Do orientation.rotation and angular_velocity need to change since the center-of-mass changed?
+			for handle in self.colliders.iter() {
+				let collider = colliders.get(*handle).unwrap();
+				let offset = self.orientation.position_into_world(&collider.get_local_center_of_mass()) - self.orientation.position;
+				let translated_moment_of_inertia =
+					self.orientation.tensor_into_world(&collider.get_moment_of_inertia_tensor()) +
+					collider.get_mass() * (Mat3::from_diagonal_element(offset.dot(&offset)) - offset * offset.transpose());
+				self.inverse_moment_of_inertia += translated_moment_of_inertia;
+			}
+			self.inverse_moment_of_inertia.try_inverse_mut();
 		}
-		self.inverse_moment_of_inertia.try_inverse_mut();
 	}
 
 	/// Gets the total mass of this entity and all of its colliders.
