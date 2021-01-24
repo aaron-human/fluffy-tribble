@@ -1,3 +1,5 @@
+use std::f32::INFINITY;
+
 use crate::consts::EPSILON;
 use crate::types::{Vec3};
 use crate::range::Range;
@@ -80,7 +82,7 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 			&sphere_start_position,
 			&(sphere_end_position - sphere_start_position),
 			&plane_start_position,
-			&plane.normal,
+			&plane.normal, // TODO: The plane's normal could rotate?
 			&(plane_end_position - plane_start_position)
 		);
 		// Must negate the normal as the sphere is the first collider.
@@ -98,39 +100,28 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 
 /// Collide a sphere with an inifinite plane.
 pub fn collide_sphere_with_plane(radius1 : f32, center1 : &Vec3, movement1 : &Vec3, position2 : &Vec3, normal2 : &Vec3, movement2 : &Vec3) -> Option<Collision> {
-	let start_farthest = center1 + normal2.scale(-radius1);
-	let start_along = start_farthest.dot(&normal2);
-	let end_farthest = start_farthest + movement1;
-	let end_along   = end_farthest.dot(&normal2);
-
-	let minimal_along = position2.dot(&normal2);
-	let plane_along = (position2 + movement2).dot(&normal2);
-
-	let start = start_along - minimal_along;
-	let delta = (plane_along - minimal_along) - (end_along - start_along);
-
-	if delta.abs() < EPSILON {
-		if start_along < minimal_along {
-			Some(Collision {
-				times: Range::single(0.0),
-				position: start_farthest,
-				normal: -normal2,
-			})
-		} else {
-			None
-		}
-	} else {
-		let time = start / delta;
-		if 0.0 < time && time < 1.0 {
-			Some(Collision {
-				times: Range::single(time),
-				position: start_farthest + (end_farthest - start_farthest).scale(time),
-				normal: -normal2,
-			})
-		} else {
-			None
-		}
-	}
+	let start_nearest  = center1 + normal2.scale(-radius1);
+	let start_farthest = center1 + normal2.scale( radius1);
+	let circle_range = Range::range(
+		start_nearest.dot(normal2),
+		start_farthest.dot(normal2),
+	);
+	let plane_range = Range::range(
+		position2.dot(normal2),
+		-INFINITY,
+	);
+	let mut times = circle_range.linear_overlap(
+		&plane_range,
+		movement2.dot(normal2) - movement1.dot(normal2),
+	);
+	times = times.intersect(&Range::range(0.0, 1.0));
+	if !times.is_empty() {
+		Some(Collision {
+			times,
+			position: start_nearest + movement1.scale(times.min()),
+			normal: -normal2,
+		})
+	} else { None }
 }
 
 /// Detect when and where a point hits a sphere (if ever).

@@ -107,6 +107,25 @@ impl Range {
 			}
 		}
 	}
+
+	/// If the other is moving at other_movement, see when the two ranges will overlap.
+	pub fn linear_overlap(&self, other : &Range, other_movement : f32) -> Range {
+		if other_movement.abs() < EPSILON {
+			if self.intersect(other).is_empty() {
+				Range::empty()
+			} else {
+				Range::everything()
+			}
+		} else {
+			Range::range(
+				(self.min() - other.min()) / other_movement,
+				(self.max() - other.min()) / other_movement,
+			).contain(&Range::range(
+				(self.min() - other.max()) / other_movement,
+				(self.max() - other.max()) / other_movement,
+			))
+		}
+	}
 }
 
 #[cfg(test)]
