@@ -9,8 +9,9 @@ use crate::entity::{InternalEntity, Entity};
 use crate::collider::{ColliderType, InternalCollider};
 #[allow(unused_imports)] // Need this trait, but Rust's warning system doesn't seem to understand that.
 use crate::collider::Collider;
-use crate::sphere_collider::{InternalSphereCollider};
 use crate::null_collider::{InternalNullCollider};
+use crate::sphere_collider::{InternalSphereCollider};
+use crate::plane_collider::{InternalPlaneCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::collide;
 
@@ -103,6 +104,14 @@ impl PhysicsSystem {
 					Err(a) => Err(a)
 				}
 			}
+			ColliderWrapper::Plane(source) => {
+				match InternalPlaneCollider::new_from(&source) {
+					Ok(internal) => {
+						Ok(self.colliders.borrow_mut().insert(internal))
+					},
+					Err(a) => Err(a)
+				}
+			}
 		}
 	}
 
@@ -128,6 +137,9 @@ impl PhysicsSystem {
 				}
 				ColliderType::SPHERE => {
 					Some(ColliderWrapper::Sphere(collider.downcast_ref::<InternalSphereCollider>().unwrap().make_pub()))
+				}
+				ColliderType::PLANE => {
+					Some(ColliderWrapper::Plane(collider.downcast_ref::<InternalPlaneCollider>().unwrap().make_pub()))
 				}
 			}
 		} else { None }
@@ -155,6 +167,13 @@ impl PhysicsSystem {
 			}
 			ColliderWrapper::Sphere(typed_source) => {
 				if let Some(typed_dest) = collider.downcast_mut::<InternalSphereCollider>() {
+					typed_dest.update_from(&typed_source)
+				} else {
+					return Err(());
+				}
+			}
+			ColliderWrapper::Plane(typed_source) => {
+				if let Some(typed_dest) = collider.downcast_mut::<InternalPlaneCollider>() {
 					typed_dest.update_from(&typed_source)
 				} else {
 					return Err(());
@@ -383,8 +402,9 @@ impl PhysicsSystem {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::sphere_collider::SphereCollider;
 	use crate::null_collider::NullCollider;
+	use crate::sphere_collider::SphereCollider;
+	use crate::plane_collider::PlaneCollider;
 
 	/// Verify can create/store/remove entities.
 	#[test]
@@ -655,6 +675,39 @@ mod tests {
 			let interface = system.get_entity(entity).unwrap();
 			assert!((interface.position - Vec3::new(-1.0, -1.0, -1.0)).magnitude() < EPSILON);
 		}
+	}
+
+	/// Verify can create/link/update a PlaneCollider.
+	#[test]
+	fn basic_plane_collider() {
+		let mut system = PhysicsSystem::new();
+		let collider = {
+			let plane = PlaneCollider::new();
+			assert!(plane.is_valid());
+			system.add_collider(ColliderWrapper::Plane(plane)).unwrap()
+		};
+		{
+			let mut plane = PlaneCollider::new();
+			plane.normal = Vec3::new(1.0, 0.0, 0.0);
+			assert!(plane.is_valid());
+			system.update_collider(collider, ColliderWrapper::Plane(plane)).unwrap()
+		}
+		{
+			let mut plane = PlaneCollider::new();
+			plane.normal = Vec3::new(1.0, 0.0, 0.0);
+			if let ColliderWrapper::Plane(plane) = system.get_collider(collider).unwrap() {
+				assert!((plane.normal - Vec3::new(1.0, 0.0, 0.0)).magnitude() < EPSILON);
+			} else {
+				panic!("Didn't get a plane!");
+			}
+		}
+		let entity = {
+			let entity = Entity::new();
+			system.add_entity(entity).unwrap()
+		};
+		system.link_collider(collider, Some(entity)).unwrap();
+		system.step(1.0); // Make sure nothing panics with the collider.
+		system.link_collider(collider, None).unwrap();
 	}
 
 	/// Verify very basic billiard-ball example: two equal masses. One's at rest, the other hits it exactly head-on. All velocity should travel to the immobile one.

@@ -17,7 +17,7 @@ pub struct InternalNullCollider {
 impl InternalNullCollider {
 	/// Creates a new instance.
 	pub fn new_from(source : &NullCollider) -> Result<Box<dyn InternalCollider>, ()> {
-		if 0.0 > source.mass {
+		if !source.is_valid() {
 			Err(()) // TODO: An error type.
 		} else {
 			Ok(Box::new(InternalNullCollider {
@@ -41,7 +41,7 @@ impl InternalNullCollider {
 
 	/// Updates from the passed in Entity object.
 	pub fn update_from(&mut self, source : &NullCollider) -> Result<(),()> {
-		if 0.0 > source.mass {
+		if !source.is_valid() {
 			Err(()) // TODO: An error type.
 		} else {
 			self.position = source.position;
@@ -66,9 +66,6 @@ impl InternalCollider for InternalNullCollider {
 	/// Retrieves the stored entity handle that this is attached to.
 	fn get_entity(&mut self) -> Option<EntityHandle> { self.entity }
 
-	/// Gets the center of mass for this collider.
-	/// This is relative to this collider's owning/linked/attached entity.
-	/// This IS NOT relative to this collider's "center" property.
 	fn get_local_center_of_mass(&self) -> Vec3 { self.position }
 
 	fn get_mass(&self) -> f32 { self.mass }
@@ -111,6 +108,11 @@ impl NullCollider {
 			mass: 0.0,
 			moment_of_inertia: Mat3::zeros(),
 		}
+	}
+
+	/// Check if this is in a valid state.
+	pub fn is_valid(&self) -> bool {
+		0.0 <= self.mass
 	}
 }
 

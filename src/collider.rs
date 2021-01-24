@@ -11,6 +11,8 @@ pub enum ColliderType {
 	NULL,
 	/// For the [crate::SphereCollider].
 	SPHERE,
+	/// For the [crate::PlaneCollider].
+	PLANE,
 }
 
 /// The internal representation of an arbitrary collider.
