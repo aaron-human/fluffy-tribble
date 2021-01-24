@@ -50,10 +50,10 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 
 	if ColliderType::SPHERE == collider1.get_type() && ColliderType::PLANE == collider2.get_type() {
 		let sphere = collider1.downcast_ref::<InternalSphereCollider>().unwrap();
-		let plane  = collider2.downcast_ref::<InternalPlaneCollider>().unwrap();
-
 		let sphere_start_position = start1.position_into_world(&sphere.center);
 		let sphere_end_position = end1.position_into_world(&sphere.center);
+
+		let plane  = collider2.downcast_ref::<InternalPlaneCollider>().unwrap();
 		let plane_start_position = start2.position_into_world(&plane.position);
 		let plane_end_position = end2.position_into_world(&plane.position);
 
@@ -68,12 +68,12 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 	}
 	if ColliderType::PLANE == collider1.get_type() && ColliderType::SPHERE == collider2.get_type() {
 		let plane  = collider1.downcast_ref::<InternalPlaneCollider>().unwrap();
-		let sphere = collider2.downcast_ref::<InternalSphereCollider>().unwrap();
+		let plane_start_position = start1.position_into_world(&plane.position);
+		let plane_end_position = end1.position_into_world(&plane.position);
 
-		let sphere_start_position = start1.position_into_world(&sphere.center);
-		let sphere_end_position = end1.position_into_world(&sphere.center);
-		let plane_start_position = start2.position_into_world(&plane.position);
-		let plane_end_position = end2.position_into_world(&plane.position);
+		let sphere = collider2.downcast_ref::<InternalSphereCollider>().unwrap();
+		let sphere_start_position = start2.position_into_world(&sphere.center);
+		let sphere_end_position = end2.position_into_world(&sphere.center);
 
 		let collision_option = collide_sphere_with_plane(
 			sphere.radius,
@@ -121,7 +121,7 @@ pub fn collide_sphere_with_plane(radius1 : f32, center1 : &Vec3, movement1 : &Ve
 		}
 	} else {
 		let time = start / delta;
-		if time < 1.0 {
+		if 0.0 < time && time < 1.0 {
 			Some(Collision {
 				times: Range::single(time),
 				position: start_farthest + (end_farthest - start_farthest).scale(time),
@@ -176,6 +176,24 @@ mod tests {
 			assert!((hit.times.min() - 0.5).abs() < EPSILON);
 			assert!((hit.position - Vec3::new(3.0, 1.0, 1.0)).magnitude() < EPSILON);
 			assert!((hit.normal - Vec3::new(1.0, 0.0, 0.0)).magnitude() < EPSILON);
+		}
+	}
+
+	#[test]
+	fn check_collide_sphere_with_plane() {
+		{ // Two spheres moving toward eachother.
+			let hit = collide_sphere_with_plane(
+				1.0,
+				&Vec3::new(1.0, 1.0, 1.0),
+				&Vec3::new(0.0, -2.0, 0.0),
+				&Vec3::new(2.0, -1.0, 5.0),
+				&Vec3::y(),
+				&Vec3::new(1.0, 0.0, 1.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			println!("hit: {:?}", hit);
+			assert!((hit.position - Vec3::new(1.0, -1.0, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, -1.0, 0.0)).magnitude() < EPSILON);
 		}
 	}
 }
