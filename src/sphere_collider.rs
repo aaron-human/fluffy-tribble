@@ -21,28 +21,18 @@ pub struct InternalSphereCollider {
 
 impl InternalSphereCollider {
 	/// Creates a new instance.
-	pub fn new(offset : &Vec3, radius : f32, mass : f32, restitution_coefficient : f32) -> Result<Box<dyn InternalCollider>, ()> {
-		if CONTACT_MARGIN >= radius || 0.0 > mass {
+	pub fn new_from(source : &SphereCollider) -> Result<Box<dyn InternalCollider>, ()> {
+		if CONTACT_MARGIN >= source.radius || 0.0 > source.mass {
 			Err(()) // TODO: An error type.
 		} else {
 			Ok(Box::new(InternalSphereCollider {
 				entity: None,
-				center: offset.clone(),
-				radius,
-				mass,
-				restitution_coefficient,
+				center: source.center.clone(),
+				radius: source.radius,
+				mass: source.mass,
+				restitution_coefficient: source.restitution_coefficient,
 			}))
 		}
-	}
-
-	/// Creates from a new instance from a given SphereCollider.
-	pub fn from(source : &SphereCollider) -> Result<Box<dyn InternalCollider>, ()> {
-		InternalSphereCollider::new(
-			&source.center,
-			source.radius,
-			source.mass,
-			source.restitution_coefficient,
-		)
 	}
 
 	/// Makes a SphereCollider copying this instance's values.
@@ -64,6 +54,7 @@ impl InternalSphereCollider {
 			self.center = source.center;
 			self.radius = source.radius;
 			self.mass = source.mass;
+			self.restitution_coefficient = source.restitution_coefficient;
 			Ok(())
 		}
 	}
@@ -105,22 +96,42 @@ impl InternalCollider for InternalSphereCollider {
 /// A copy of all of the publicly-accessible properties of a spherical collider.
 #[derive(Debug)]
 pub struct SphereCollider {
-	/// The entity, if there is one.
+	/// The entity, if there is one. This is NOT copied back into InternalSphereCollider, hence why it's not "pub".
+	///
+	/// Defaults to None.
 	entity : Option<EntityHandle>,
+
 	/// The position of the center relative to the parent entity's origin.
+	///
+	/// Defaults to origin.
 	pub center : Vec3,
+
 	/// The radius.
+	///
+	/// Has no default.
 	pub radius : f32,
+
 	/// The total mass.
+	///
+	/// Defaults to zero.
 	pub mass : f32,
+
 	/// The restituion coefficient.
+	///
+	/// Defaults to one.
 	pub restitution_coefficient : f32,
 }
 
 impl SphereCollider {
-	/// Creates an instance.
-	pub fn new(center : &Vec3, radius : f32, mass : f32, restitution_coefficient : f32) -> SphereCollider {
-		SphereCollider { entity: None, center: center.clone(), radius, mass, restitution_coefficient, }
+	/// Creates an instance with all values at default.
+	pub fn new(radius : f32) -> SphereCollider {
+		SphereCollider {
+			entity: None,
+			center: Vec3::zeros(),
+			radius,
+			mass: 0.0,
+			restitution_coefficient: 1.0,
+		}
 	}
 }
 

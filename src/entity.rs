@@ -39,21 +39,17 @@ pub struct InternalEntity {
 
 impl InternalEntity {
 	/// Creates a new instance.
-	pub fn new(position : &Vec3, mass : f32) -> Result<InternalEntity, ()> {
-		if 0.0 > mass { return Err(()); }
+	pub fn new_from(source : Entity) -> Result<InternalEntity, ()> {
+		if 0.0 > source.own_mass { return Err(()); }
 		Ok(InternalEntity {
-			orientation: Orientation::new(
-				position,
-				&Vec3::zeros(), // Start with no rotation.
-				&Vec3::zeros(), // Start with position as the center-of-mass, even if there is no mass.
-			),
+			orientation: source.make_orientation(),
 
-			own_mass: mass,
-			total_mass: mass,
+			own_mass: source.own_mass,
+			total_mass: source.own_mass,
 			inverse_moment_of_inertia: Mat3::zeros(),
 
-			velocity: Vec3::zeros(),
-			angular_velocity: Vec3::zeros(),
+			velocity: source.velocity,
+			angular_velocity: source.angular_velocity,
 			colliders: HashSet::new(),
 		})
 	}
@@ -145,21 +141,31 @@ impl InternalEntity {
 }
 
 /// A copy of all of the publicly-accessible properties of a physical object in the world.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entity {
 	/// The current position of the center of mass in WORLD space.
+	///
+	/// Defaults to origin.
 	pub position : Vec3,
 
 	/// The current rotation about the center of mass in WORLD space.
+	///
+	/// Defaults to no rotation (zero vector).
 	pub rotation : Vec3,
 
 	/// The current velocity of the center of mass in WORLD space.
+	///
+	/// Defaults to no movement (zero vector).
 	pub velocity : Vec3,
 
 	/// The current angular velocity about the center of mass in WORLD space.
+	///
+	/// Defaults to no rotation (zero vector).
 	pub angular_velocity : Vec3,
 
 	/// All colliders that are attached/linked to this.
+	///
+	/// Defaults to an empty set.
 	colliders : HashSet<ColliderHandle>,
 
 	/// The current mass that just this entity contributes as a point-mass at the center of mass.
@@ -167,16 +173,41 @@ pub struct Entity {
 	/// This does NOT include collider masses.
 	///
 	/// Note that this mass does NOT affect how the center of mass is decided. That's strictly a weighted sum with the colliders.
+	///
+	/// Defaults to zero.
 	pub own_mass : f32,
 
 	/// The last known orientation. This is very much read-only.
+	///
+	/// Defaults to having no offset or transform.
 	last_orientation : Orientation,
 
 	/// Last known total mass (including colliders). This is very much read-only.
+	///
+	/// Defaults to zero.
 	last_total_mass : f32,
 }
 
 impl Entity {
+	/// Creates a new store for entity information with everything set to its defaults.
+	/// Can use this to store info for an [crate::physics_system::add_entity] call later.
+	pub fn new() -> Entity {
+		Entity {
+			position: Vec3::zeros(),
+			rotation: Vec3::zeros(),
+			velocity: Vec3::zeros(),
+			angular_velocity: Vec3::zeros(),
+			colliders: HashSet::new(),
+			own_mass: 0.0,
+			last_orientation: Orientation::new(
+				&Vec3::zeros(),
+				&Vec3::zeros(),
+				&Vec3::zeros(),
+			),
+			last_total_mass: 0.0,
+		}
+	}
+
 	/// Gets all collider handles.
 	///
 	/// Notibly this is just the getter, as this object cannot be used to modify what colliders are attached to this entity (must use `link_collider()` for that).
@@ -192,5 +223,14 @@ impl Entity {
 	/// This makes it easy to convert from local coordinates to global ones.
 	pub fn get_last_orientation<'a>(&'a self) -> &'a Orientation {
 		&self.last_orientation
+	}
+
+	/// Creates a new orientation using the current values of position and rotation along with the center of mass offset from the last orientation.
+	pub fn make_orientation(&self) -> Orientation {
+		Orientation::new(
+			&self.position,
+			&self.rotation,
+			&self.last_orientation.internal_origin_offset,
+		)
 	}
 }

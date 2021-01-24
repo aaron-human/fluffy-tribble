@@ -49,8 +49,8 @@ impl PhysicsSystem {
 	}
 
 	/// Adds an entity and returns its handle.
-	pub fn add_entity(&mut self, position : &Vec3, mass : f32) -> Result<EntityHandle, ()> {
-		let new_entity = InternalEntity::new(position, mass)?;
+	pub fn add_entity(&mut self, source : Entity) -> Result<EntityHandle, ()> {
+		let new_entity = InternalEntity::new_from(source)?;
 		Ok(self.entities.borrow_mut().insert(new_entity))
 	}
 
@@ -96,7 +96,7 @@ impl PhysicsSystem {
 				}
 			}
 			ColliderWrapper::Sphere(source) => {
-				match InternalSphereCollider::from(&source) {
+				match InternalSphereCollider::new_from(&source) {
 					Ok(internal) => {
 						Ok(self.colliders.borrow_mut().insert(internal))
 					},
@@ -315,13 +315,10 @@ impl PhysicsSystem {
 			for info in &mut entity_info {
 				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
 				let entity = entities.get_mut(info.handle).unwrap();
-				println!("Entity {:?} before orientation {:?}", info.handle, entity.orientation);
 				entity.orientation.affect_with(
 					&(info.linear_movement  * earliest_collision_percent),
 					&(info.angular_movement * earliest_collision_percent),
 				);
-				println!("Entity {:?} updated with {:?} * {}", info.handle, info.linear_movement, earliest_collision_percent);
-				println!("Entity {:?} after orientation {:?}", info.handle, entity.orientation);
 				info.linear_movement *= after_collision_percent;
 				info.angular_movement *= after_collision_percent;
 			}
@@ -396,7 +393,11 @@ mod tests {
 		let mut system = PhysicsSystem::new();
 		// Check nothing breaks with no items.
 		system.step(1.0);
-		let first = system.add_entity(&Vec3::new(1.0, 2.0, 3.0), 1.0).unwrap();
+		let first = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(1.0, 2.0, 3.0);
+			system.add_entity(entity).unwrap()
+		};
 		{
 			let mut interface = system.get_entity(first).unwrap();
 			assert_eq!(interface.position.x, 1.0);
@@ -438,12 +439,11 @@ mod tests {
 	#[test]
 	fn store_collider() {
 		let mut system = PhysicsSystem::new();
-		let id = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-			&Vec3::new(0.0, 0.0, 1.0),
-			2.0,
-			1.0,
-			1.0,
-		))).unwrap();
+		let id = {
+			let mut sphere = SphereCollider::new(2.0);
+			sphere.center = Vec3::new(0.0, 0.0, 1.0);
+			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+		};
 		if let ColliderWrapper::Sphere(mut interface) = system.get_collider(id).unwrap() {
 			assert_eq!(interface.center.x, 0.0);
 			assert_eq!(interface.center.y, 0.0);
@@ -474,13 +474,15 @@ mod tests {
 	#[test]
 	fn link_collider() {
 		let mut system = PhysicsSystem::new();
-		let first = system.add_entity(&Vec3::zeros(), 1.0).unwrap();
-		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-			&Vec3::new(0.0, 0.0, 1.0),
-			2.0,
-			1.0,
-			1.0,
-		))).unwrap();
+		let first = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(0.0, 0.0, 1.0);
+			system.add_entity(entity).unwrap()
+		};
+		let collider = {
+			let sphere = SphereCollider::new(2.0);
+			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+		};
 		{ // Entities start with no colliders. And colliders start with no entities.
 			let interface = system.get_entity(first).unwrap();
 			assert_eq!(interface.get_colliders().len(), 0);
@@ -497,7 +499,10 @@ mod tests {
 				assert_eq!(interface.get_entity(), Some(first));
 			} else { panic!("Didn't get a sphere?"); }
 		}
-		let second = system.add_entity(&Vec3::zeros(), 1.0).unwrap();
+		let second = {
+			let entity = Entity::new();
+			system.add_entity(entity).unwrap()
+		};
 		system.link_collider(collider, Some(second)).unwrap();
 		{ // Can transfer collider easily.
 			let interface = system.get_entity(first).unwrap();
@@ -510,7 +515,10 @@ mod tests {
 			} else { panic!("Didn't get a sphere?"); }
 		}
 		{ // Verify can't add a collider to a missing entity.
-			let temp = system.add_entity(&Vec3::zeros(), 1.0).unwrap();
+			let temp = {
+				let entity = Entity::new();
+				system.add_entity(entity).unwrap()
+			};
 			system.remove_entity(temp);
 			assert_eq!(system.link_collider(collider, Some(temp)), Err(()));
 			// That shouldn't have changed anything.
@@ -524,12 +532,10 @@ mod tests {
 			} else { panic!("Didn't get a sphere?"); }
 		}
 		{ // Verify can't add a missing collier to an entity.
-			let temp = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-				&Vec3::new(0.0, 0.0, 1.0),
-				2.0,
-				1.0,
-				1.0,
-			))).unwrap();
+			let temp = {
+				let sphere = SphereCollider::new(2.0);
+				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+			};
 			system.remove_collider(temp);
 			assert_eq!(system.link_collider(temp, Some(second)), Err(()));
 			// That shouldn't have changed anything.
@@ -577,17 +583,21 @@ mod tests {
 	#[test]
 	fn entity_local_space_unchanged() {
 		let mut system = PhysicsSystem::new();
-		let entity = system.add_entity(&Vec3::new(1.0, 2.0, 3.0), 1.0).unwrap();
+		let entity = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(1.0, 2.0, 3.0);
+			system.add_entity(entity).unwrap()
+		};
 		{
 			let interface = system.get_entity(entity).unwrap();
 			assert!((interface.position - Vec3::new(1.0, 2.0, 3.0)).magnitude() < EPSILON);
 		}
-		let collider1 = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-			&Vec3::new(-1.0, 15.0, 8.0),
-			1.0,
-			1.0,
-			1.0,
-		))).unwrap();
+		let collider1 = {
+			let mut sphere = SphereCollider::new(1.0);
+			sphere.center = Vec3::new(-1.0, 15.0, 8.0);
+			sphere.mass = 1.0;
+			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+		};
 		system.link_collider(collider1, Some(entity)).unwrap();
 		{
 			let interface = system.get_entity(entity).unwrap();
@@ -601,12 +611,12 @@ mod tests {
 			let origin = interface.get_last_orientation().local_origin_in_world();
 			assert!((origin - Vec3::new(1.0, 2.0, 3.0)).magnitude() < EPSILON);
 		}
-		let collider2 = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-			&Vec3::new(8.0, -1.0, 5.0),
-			1.0,
-			1.0,
-			1.0,
-		))).unwrap();
+		let collider2 = {
+			let mut sphere = SphereCollider::new(1.0);
+			sphere.center = Vec3::new(8.0, -1.0, 5.0);
+			sphere.mass = 1.0;
+			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+		};
 		system.link_collider(collider2, Some(entity)).unwrap();
 		system.link_collider(collider1, Some(entity)).unwrap();
 		{
@@ -620,7 +630,11 @@ mod tests {
 	#[test]
 	fn link_null_collider() {
 		let mut system = PhysicsSystem::new();
-		let entity = system.add_entity(&Vec3::new(-1.0, -1.0, -1.0), 1.0).unwrap();
+		let entity = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(-1.0, -1.0, -1.0);
+			system.add_entity(entity).unwrap()
+		};
 		{
 			let interface = system.get_entity(entity).unwrap();
 			assert!((interface.position - Vec3::new(-1.0, -1.0, -1.0)).magnitude() < EPSILON);
@@ -647,14 +661,18 @@ mod tests {
 	#[test]
 	fn equal_mass_billiard_balls() {
 		let mut system = PhysicsSystem::new();
-		let first = system.add_entity(&Vec3::zeros(), 1.0).unwrap();
+		let first = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::zeros();
+			entity.own_mass = 1.0;
+			system.add_entity(entity).unwrap()
+		};
 		{
-			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-				&Vec3::zeros(),
-				1.0,
-				1.0,
-				1.0,
-			))).unwrap();
+			let collider = {
+				let mut sphere = SphereCollider::new(1.0);
+				sphere.mass = 1.0;
+				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+			};
 			system.link_collider(collider, Some(first)).unwrap();
 		}
 		{
@@ -662,14 +680,18 @@ mod tests {
 			temp.velocity.x = 2.0;
 			system.update_entity(first, temp).unwrap();
 		}
-		let second = system.add_entity(&Vec3::new(3.0, 0.0, 0.0), 1.0).unwrap();
+		let second = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(3.0, 0.0, 0.0);
+			entity.own_mass = 1.0;
+			system.add_entity(entity).unwrap()
+		};
 		{
-			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-				&Vec3::zeros(),
-				1.0,
-				1.0,
-				1.0,
-			))).unwrap();
+			let collider = {
+				let mut sphere = SphereCollider::new(1.0);
+				sphere.mass = 1.0;
+				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+			};
 			system.link_collider(collider, Some(second)).unwrap();
 		}
 		system.step(1.0);
@@ -691,7 +713,11 @@ mod tests {
 	#[test]
 	fn entity_auto_update() {
 		let mut system = PhysicsSystem::new();
-		let first = system.add_entity(&Vec3::zeros(), 1.0).unwrap();
+		let first = {
+			let mut entity = Entity::new();
+			entity.own_mass = 1.0;
+			system.add_entity(entity).unwrap()
+		};
 		{
 			let mut temp = system.get_entity(first).unwrap();
 			temp.own_mass = 2.0;
@@ -699,12 +725,11 @@ mod tests {
 			// Verify the total mass changed.
 			assert_eq!(system.get_entity(first).unwrap().get_last_total_mass(), 2.0);
 		}
-		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-			&Vec3::zeros(),
-			1.0,
-			1.0,
-			1.0,
-		))).unwrap();
+		let collider = {
+			let mut sphere = SphereCollider::new(1.0);
+			sphere.mass = 1.0;
+			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+		};
 		{
 			assert_eq!(system.get_entity(first).unwrap().get_last_total_mass(), 2.0);
 		}
@@ -726,7 +751,10 @@ mod tests {
 		}
 		// Remove the collider and make sure the entity updates.
 		// This checks switching the collider to a new entity.
-		let second = system.add_entity(&Vec3::zeros(), 0.0).unwrap();
+		let second = {
+			let entity = Entity::new();
+			system.add_entity(entity).unwrap()
+		};
 		system.link_collider(collider, Some(second)).unwrap();
 		{
 			assert_eq!(system.get_entity(first).unwrap().get_last_total_mass(), 2.0);
@@ -744,13 +772,15 @@ mod tests {
 	#[test]
 	fn angular_update() {
 		let mut system = PhysicsSystem::new();
-		let first = system.add_entity(&Vec3::new(1.0, 1.0, 1.0), 0.0).unwrap();
-		let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-			&Vec3::zeros(),
-			1.0,
-			1.0,
-			1.0,
-		))).unwrap();
+		let first = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(1.0, 1.0, 1.0);
+			system.add_entity(entity).unwrap()
+		};
+		let collider = {
+			let sphere = SphereCollider::new(1.0);
+			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+		};
 		system.link_collider(collider, Some(first)).unwrap();
 		{
 			let mut temp = system.get_entity(first).unwrap();
@@ -780,14 +810,16 @@ mod tests {
 	#[test]
 	fn angular_adsorb_all_momentum() {
 		let mut system = PhysicsSystem::new();
-		let first = system.add_entity(&Vec3::new(0.0, 0.0, 0.0), 0.0).unwrap();
+		let first = {
+			let entity = Entity::new();
+			system.add_entity(entity).unwrap()
+		};
 		{ // Add a collider
-			let collider = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-				&Vec3::zeros(),
-				1.0,
-				1.0,
-				1.0,
-			))).unwrap();
+			let collider = {
+				let mut sphere = SphereCollider::new(1.0);
+				sphere.mass = 1.0;
+				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+			};
 			system.link_collider(collider, Some(first)).unwrap();
 		}
 		{ // Set the velocity to y = +1
@@ -795,21 +827,25 @@ mod tests {
 			temp.velocity.y = 1.0;
 			system.update_entity(first, temp).unwrap();
 		}
-		let dual = system.add_entity(&Vec3::new(2.0, 3.0, 0.0), 0.0).unwrap();
+		let dual = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(2.0, 3.0, 0.0);
+			system.add_entity(entity).unwrap()
+		};
 		{ // Add two colliders
-			let left = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-				&Vec3::new(-2.0, 0.0, 0.0),
-				1.0,
-				1.0,
-				1.0,
-			))).unwrap();
+			let left = {
+				let mut sphere = SphereCollider::new(1.0);
+				sphere.center = Vec3::new(-2.0, 0.0, 0.0);
+				sphere.mass = 1.0;
+				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+			};
 			system.link_collider(left, Some(dual)).unwrap();
-			let right = system.add_collider(ColliderWrapper::Sphere(SphereCollider::new(
-				&Vec3::new(2.0, 0.0, 0.0),
-				1.0,
-				1.0,
-				1.0,
-			))).unwrap();
+			let right = {
+				let mut sphere = SphereCollider::new(1.0);
+				sphere.center = Vec3::new(2.0, 0.0, 0.0);
+				sphere.mass = 1.0;
+				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
+			};
 			system.link_collider(right, Some(dual)).unwrap();
 		}
 		system.step(2.0);
