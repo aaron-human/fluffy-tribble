@@ -88,7 +88,7 @@ impl PhysicsSystem {
 	pub fn add_collider(&mut self, source : ColliderWrapper) -> Result<ColliderHandle, ()> {
 		match source {
 			ColliderWrapper::Null(source) => {
-				match InternalNullCollider::from(&source) {
+				match InternalNullCollider::new_from(&source) {
 					Ok(internal) => {
 						Ok(self.colliders.borrow_mut().insert(internal))
 					},
@@ -383,7 +383,6 @@ impl PhysicsSystem {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::types::Mat3;
 	use crate::sphere_collider::SphereCollider;
 	use crate::null_collider::NullCollider;
 
@@ -639,11 +638,12 @@ mod tests {
 			let interface = system.get_entity(entity).unwrap();
 			assert!((interface.position - Vec3::new(-1.0, -1.0, -1.0)).magnitude() < EPSILON);
 		}
-		let collider = system.add_collider(ColliderWrapper::Null(NullCollider::new(
-			&Vec3::new(2.0, 2.0, 2.0),
-			1.0,
-			Mat3::zeros(),
-		))).unwrap();
+		let collider = {
+			let mut null = NullCollider::new();
+			null.position = Vec3::new(2.0, 2.0, 2.0);
+			null.mass = 1.0;
+			system.add_collider(ColliderWrapper::Null(null)).unwrap()
+		};
 		system.link_collider(collider, Some(entity)).unwrap();
 		{
 			let interface = system.get_entity(entity).unwrap();

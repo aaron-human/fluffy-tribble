@@ -16,26 +16,17 @@ pub struct InternalNullCollider {
 
 impl InternalNullCollider {
 	/// Creates a new instance.
-	pub fn new(position : &Vec3, mass : f32, moment_of_inertia : Mat3) -> Result<Box<dyn InternalCollider>, ()> {
-		if 0.0 > mass {
+	pub fn new_from(source : &NullCollider) -> Result<Box<dyn InternalCollider>, ()> {
+		if 0.0 > source.mass {
 			Err(()) // TODO: An error type.
 		} else {
 			Ok(Box::new(InternalNullCollider {
 				entity: None,
-				position: *position,
-				mass,
-				moment_of_inertia,
+				position: source.position,
+				mass: source.mass,
+				moment_of_inertia: source.moment_of_inertia,
 			}))
 		}
-	}
-
-	/// Creates from an NullCollider.
-	pub fn from(source : &NullCollider) -> Result<Box<dyn InternalCollider>, ()> {
-		InternalNullCollider::new(
-			&source.position,
-			source.mass,
-			source.moment_of_inertia,
-		)
 	}
 
 	/// Makes a NullCollider copying this instance's values.
@@ -90,20 +81,36 @@ impl InternalCollider for InternalNullCollider {
 /// A collider that doesn't collide. Instead it just provides mass and inertia at a point.
 #[derive(Debug)]
 pub struct NullCollider {
-	/// The entity that this is linked to (if any).
+	/// The entity that this is linked to (if any). This is NOT copied back into InternalSphereCollider, hence why it's not "pub".
+	///
+	/// Defaults to None.
 	entity : Option<EntityHandle>,
+
 	/// The position of the mass (relative to the parent's origin).
+	///
+	/// Defaults to origin.
 	pub position : Vec3,
+
 	/// The total mass. Must not be negative.
+	///
+	/// Defaults to zero.
 	pub mass : f32,
+
 	/// The moment of inertia tensor. May be a zero matrix if there isn't any.
+	///
+	/// Defaults to all zeros.
 	pub moment_of_inertia : Mat3,
 }
 
 impl NullCollider {
 	/// Creates an instance.
-	pub fn new(position : &Vec3, mass : f32, moment_of_inertia : Mat3) -> NullCollider {
-		NullCollider { entity: None, position: position.clone(), mass, moment_of_inertia, }
+	pub fn new() -> NullCollider {
+		NullCollider {
+			entity: None,
+			position: Vec3::zeros(),
+			mass: 0.0,
+			moment_of_inertia: Mat3::zeros(),
+		}
 	}
 }
 
