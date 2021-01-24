@@ -25,9 +25,10 @@ pub struct PhysicsSystem {
 	pub iteration_max : u8,
 
 	/// A debugging value to get info out.
-	pub debug : Vec<f32>,
+	pub debug : Vec<String>,
 }
 
+#[derive(Debug)]
 struct EntityStepInfo {
 	/// The entity handle.
 	handle : EntityHandle,
@@ -254,7 +255,7 @@ impl PhysicsSystem {
 		// That should be able to split the world into islands of boxes that collide
 
 		let mut time_left = dt;
-		for _iteration in 0..self.iteration_max {
+		for iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
 			// Will be "done" once no collisions left or run out of iterations.
 
@@ -304,12 +305,16 @@ impl PhysicsSystem {
 								&second_end_orientation,
 							);
 							if let Some(collision) = collision_option {
+								self.debug.push(format!("{} collision at: {:?}", iteration, collision));
+								self.debug.push(format!("{} first: {:?}", iteration, first_collider_handle));
+								self.debug.push(format!("{} second: {:?}", iteration, second_collider_handle));
 								let time = collision.times.min();
 								// If the objects are (already) moving away from the point of contact, then ignore the collision.
-								let first_moving_away  = EPSILON > collision.normal.dot(&first.velocity);
-								let second_moving_away = EPSILON > collision.normal.dot(&-second.velocity);
-								if first_moving_away && second_moving_away { // TODO: May not need this?
+								let velocity_delta = first.get_velocity_at_world_position(&collision.position) - second.get_velocity_at_world_position(&collision.position);
+
+								if EPSILON > velocity_delta.dot(&collision.normal) {
 									println!("Dropping collision!");
+									self.debug.push("Dropping collision!".to_string());
 									continue;
 								}
 								// Otherwise check if this collision is the closest.
@@ -358,10 +363,9 @@ impl PhysicsSystem {
 				let first_offset = collision.position - first.orientation.position;
 				let second_offset = collision.position - second.orientation.position;
 
-				let first_total_velocity = first.velocity + first.angular_velocity.cross(&first_offset);
-				let second_total_velocity = second.velocity + second.angular_velocity.cross(&second_offset);
+				let velocity_delta = first.get_velocity_at_world_position(&collision.position) - second.get_velocity_at_world_position(&collision.position);
 
-				let numerator = -(1.0 + earliest_collision_restitution) * (first_total_velocity - second_total_velocity).dot(&collision.normal);
+				let numerator = -(1.0 + earliest_collision_restitution) * velocity_delta.dot(&collision.normal);
 				let denominator =
 					1.0 / first.get_total_mass() +
 					1.0 / second.get_total_mass() +
@@ -370,6 +374,8 @@ impl PhysicsSystem {
 						second_inverse_moment_of_inertia * second_offset.cross(&collision.normal).cross(&second_offset)
 					).dot(&collision.normal);
 				let impulse_magnitude = numerator / denominator;
+				self.debug.push(format!("{} impulse_magnitude: {:?} / {:?}", iteration, numerator, denominator));
+				self.debug.push(format!("{} normal: {:?}", iteration, collision.normal));
 
 				{
 					// Apply the impluse and re-integrate the movement.
@@ -393,6 +399,7 @@ impl PhysicsSystem {
 					second.angular_velocity -= second.get_inverse_moment_of_inertia() * (collision.position - center_of_mass).cross(&collision.normal.scale(impulse_magnitude));
 					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
+				self.debug.push("\n\n\n\n".to_string());
 			} else {
 				break; // No collision means done handling the entire step. So quit out of this loop.
 			}

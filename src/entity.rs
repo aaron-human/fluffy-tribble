@@ -147,6 +147,11 @@ impl InternalEntity {
 	pub fn get_inverse_moment_of_inertia(&self) -> Mat3 {
 		self.inverse_moment_of_inertia
 	}
+
+	/// Gets the velocity at a point (that's specified in world coordinates).
+	pub fn get_velocity_at_world_position(&self, position : &Vec3) -> Vec3 {
+		self.velocity + self.angular_velocity.cross(&(position - self.orientation.position))
+	}
 }
 
 /// A copy of all of the publicly-accessible properties of a physical object in the world.
