@@ -32,6 +32,15 @@ pub struct Orientation {
 	pub internal_origin_offset : Vec3,
 }
 
+fn translate_moment_of_inertia(moment : &Mat3, total_mass : f32, translation : &Vec3) -> Mat3 {
+	moment + total_mass * (Mat3::from_diagonal_element(translation.dot(&translation)) - translation * translation.transpose())
+}
+
+fn rotate_moment_of_inertia(moment : &Mat3, rotation : &Quat) -> Mat3 {
+	let out_of = rotation.to_rotation_matrix();
+	out_of * moment * out_of.transpose()
+}
+
 impl Orientation {
 	/// Creates a new instance.
 	pub fn new(position : &Vec3, rotation : &Vec3, internal_origin_offset : &Vec3) -> Orientation {
@@ -76,12 +85,18 @@ impl Orientation {
 		self.into_world().transform_vector(direction)
 	}
 
-	/// Converts a tensor (like that for moment-of-inertia) in local space into world space.
+	/// Transform a moment of inertia tensor that's about the given 'center_of_mass' (which is specified in local space) so that it's relative to this orientation's 'position' in local space.
+	///
+	/// Since this orientation's 'position' is usually its center-of-mass, this effectively gets the moment to be ready to be passed through finalize_moment_of_inertia() so it can be readily available in world-space (and be centered about the center of mass there).
+	pub fn prep_moment_of_inertia(&self, center_of_mass : &Vec3, total_mass : f32, moment : &Mat3) -> Mat3 {
+		translate_moment_of_inertia(moment, total_mass, &(self.internal_origin_offset + center_of_mass))
+	}
+
+	/// Completes converting a moment of inertia that was sent through prep_moment_of_inertia() so that it's in world-space.
 	///
 	/// This means it uses only this orientation's rotation (matrix) on the tensor.
-	pub fn tensor_into_world(&self, tensor : &Mat3) -> Mat3 {
-		let rotation = self.rotation.to_rotation_matrix();
-		rotation * tensor * rotation.transpose()
+	pub fn finalize_moment_of_inertia(&self, moment : &Mat3) -> Mat3 {
+		rotate_moment_of_inertia(moment, &self.rotation)
 	}
 
 	/// The local space's origin in world coordinates.
@@ -143,5 +158,14 @@ mod tests {
 			assert!((transformed.y - 0.0).abs() < EPSILON);
 			assert!((transformed.z - 1.0).abs() < EPSILON);
 		}
+	}
+
+	fn point_moment_of_inertia_tensor(point : &Vec3, mass : f32) -> Mat3 {
+		let len = point.dot(&point);
+		Mat3::new(
+			len - point.x * point.x,     - point.x * point.y,     - point.x * point.z,
+			    - point.y * point.x, len - point.y * point.y,     - point.y * point.z,
+			    - point.z * point.x,     - point.z * point.y, len - point.z * point.z,
+		).scale(mass)
 	}
 }

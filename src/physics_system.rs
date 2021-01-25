@@ -303,6 +303,7 @@ impl PhysicsSystem {
 								&second_start_orientation,
 								&second_end_orientation,
 							);
+							//println!("Collision check between {:?} and {:?} -> {:?}", first_collider_handle, second_collider_handle, collision_option);
 							if let Some(collision) = collision_option {
 								let time = collision.times.min();
 								// If the objects are (already) moving away from the point of contact, then ignore the collision.
@@ -311,7 +312,7 @@ impl PhysicsSystem {
 								let velocity_delta = first_full_velocity - second_full_velocity;
 
 								if EPSILON > velocity_delta.dot(&collision.normal) {
-									println!("Dropping collision!");
+									//println!("Dropping collision!");
 									self.debug.push(format!("Dropping collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?})", collision.position, first_collider_handle, first_full_velocity, second_collider_handle, second_full_velocity));
 									continue;
 								}
@@ -365,38 +366,40 @@ impl PhysicsSystem {
 				let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
 				let velocity_delta = first_full_velocity - second_full_velocity;
 
-				self.debug.push(format!("Handling collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?})", collision.position, first_entity_handle, first_full_velocity, second_entity_handle, second_full_velocity));
+				//self.debug.push(format!("Handling collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?})", collision.position, first_entity_handle, first_full_velocity, second_entity_handle, second_full_velocity));
 
 				let numerator = -(1.0 + earliest_collision_restitution) * velocity_delta.dot(&collision.normal);
-				let denominator =
-					1.0 / first.get_total_mass() +
-					1.0 / second.get_total_mass() +
-					(
-						first_inverse_moment_of_inertia  * first_offset.cross( &collision.normal).cross(&first_offset) +
-						second_inverse_moment_of_inertia * second_offset.cross(&collision.normal).cross(&second_offset)
-					).dot(&collision.normal);
+				let first_linear_weight   = 1.0 / first.get_total_mass();
+				let second_linear_weight  = 1.0 / second.get_total_mass();
+				let first_angular_direction = first_inverse_moment_of_inertia  * first_offset.cross( &collision.normal);
+				let first_angular_weight  = first_angular_direction.cross(&first_offset).dot( &collision.normal);
+				//first_angular_direction.normalize_mut();
+				let second_angular_direction = second_inverse_moment_of_inertia * second_offset.cross(&collision.normal);
+				let second_angular_weight = second_angular_direction.cross(&second_offset).dot(&collision.normal);
+				//second_angular_direction.normalize_mut();
+				let denominator = first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight;
 				let impulse_magnitude = numerator / denominator;
-				println!("{} impulse_magnitude: {:?} / {:?}", iteration, numerator, denominator);
-				println!("{} normal: {:?}", iteration, collision.normal);
+				//println!("{} impulse_magnitude: {:?} / {:?}", iteration, numerator, denominator);
+				//println!("{} normal: {:?}", iteration, collision.normal);
 
 				{
 					// Apply the impluse and re-integrate the movement.
 					let info = &mut entity_info[earliest_collision_first_info_index];
 
-					first.velocity += collision.normal.scale(impulse_magnitude / first.get_total_mass());
+					first.velocity += collision.normal.scale(impulse_magnitude * first_linear_weight);
 					info.linear_movement = first.velocity * time_after_collision;
 
-					first.angular_velocity += first.get_inverse_moment_of_inertia() * first_offset.cross(&collision.normal.scale(impulse_magnitude));
+					first.angular_velocity += first_angular_direction.scale(impulse_magnitude);
 					info.angular_movement = first.angular_velocity * time_after_collision;
 				}
 				{
 					// Apply the impulse and re-integrate the movement.
 					let info = &mut entity_info[earliest_collision_second_info_index];
 
-					second.velocity -= collision.normal.scale(impulse_magnitude / second.get_total_mass());
+					second.velocity -= collision.normal.scale(impulse_magnitude * second_linear_weight);
 					info.linear_movement = second.velocity * time_after_collision;
 
-					second.angular_velocity -= second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal.scale(impulse_magnitude));
+					second.angular_velocity -= second_angular_direction.scale(impulse_magnitude);
 					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
 			} else {
@@ -982,12 +985,14 @@ mod tests {
 			sphere.center = Vec3::new(1.0, 0.0, 0.0);
 			let sphere_handle = system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap();
 			system.link_collider(sphere_handle, Some(entity_handle)).unwrap();
+			println!("sphere1: {:?}", sphere_handle);
 			//
 			let mut sphere = SphereCollider::new(RADIUS);
 			sphere.mass = 1.0;
 			sphere.center = Vec3::new(-1.0, 0.0, 0.0);
 			let sphere_handle = system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap();
 			system.link_collider(sphere_handle, Some(entity_handle)).unwrap();
+			println!("sphere2: {:?}", sphere_handle);
 			//
 			entity_handle
 		};
@@ -1000,10 +1005,11 @@ mod tests {
 			plane.mass = INFINITY;
 			let plane_handle = system.add_collider(ColliderWrapper::Plane(plane)).unwrap();
 			system.link_collider(plane_handle, Some(entity_handle)).unwrap();
+			println!("wall: {:?}", plane_handle);
 			entity_handle
 		};
 		const STEP : f32 = 0.1;
-		for iteration in 0..30 {
+		for iteration in 0..100 {
 			// Reset the positions/velocities/etc of the dual and the wall.
 			let distance = -(iteration as f32) / 30.0 - 2.0;
 			let wall_position = Vec3::new(0.0, 0.0, distance);
@@ -1015,14 +1021,15 @@ mod tests {
 				//
 				let mut entity = Entity::new();
 				entity.position = wall_position;
+				entity.position = wall_position;
 				system.update_entity(wall, entity).unwrap();
 			}
 			let initial_energy = system.get_entity(dual).unwrap().get_total_energy();
 			let total_time = 2.0 * (distance.abs() - RADIUS) / START_LINEAR_VELOCITY;
 			for _ in 0..((total_time / STEP).ceil() as i32) {
 				system.step(STEP);
-				let energy = system.get_entity(dual).unwrap().get_total_energy();
-				println!("T{} Energy delta: {:?}", iteration, energy - initial_energy);
+				let _energy = system.get_entity(dual).unwrap().get_total_energy();
+				//println!("T{} Energy delta: {:?}", iteration, energy - initial_energy);
 			}
 			let (final_energy, final_velocity) = {
 				let entity = system.get_entity(dual).unwrap();
@@ -1030,14 +1037,17 @@ mod tests {
 			};
 			let delta = final_energy - initial_energy;
 			println!("T{} Energy change: {:?} -> {:?} (delta: {:?})", iteration, initial_energy, final_energy, delta);
-			assert!(delta.abs() < EPSILON*10.0);
+			assert!(delta.abs() < EPSILON*10.0);/*
+			println!("T{} final dual position: {:?}", iteration, system.get_entity(dual).unwrap().position);
+			println!("T{} final dual velocity: {:?}", iteration, final_velocity);
+			println!("T{} final wall position: {:?}", iteration, system.get_entity(wall).unwrap().position);*/
 			assert!(0.0 < final_velocity.z);
 			{ // Also verify the wall hasn't moved.
 				let new_wall_position = system.get_entity(wall).unwrap().position;
 				assert!((new_wall_position - wall_position).magnitude() < EPSILON);
 			}
 		}
-		assert!(false);
+		//panic!("Stop!");
 	}
 
 	// TODO? Only angular inertia into a collision.

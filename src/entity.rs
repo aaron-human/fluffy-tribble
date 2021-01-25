@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use generational_arena::Arena;
 
+use crate::consts::EPSILON;
 use crate::types::{Vec3, Mat3, Quat, ColliderHandle};
 use crate::collider::InternalCollider;
 use crate::orientation::Orientation;
@@ -22,17 +23,10 @@ pub struct InternalEntity {
 	/// This should only ever be udpated by calling recalculate_mass().
 	total_mass : f32,
 
-	/// The (cached) of the moment-of-inertia tensor (including all colliders).
-	/// This is in WORLD space.
+	/// The (cached) of the moment-of-inertia tensor (including all colliders) BEFORE it's been rotated to be in world space.
 	///
 	/// This should only ever be udpated by calling recalculate_mass().
-	moment_of_inertia : Mat3,
-
-	/// The (cached) inverse of the moment-of-inertia tensor (including all colliders).
-	/// This is in WORLD space.
-	///
-	/// This should only ever be udpated by calling recalculate_mass().
-	inverse_moment_of_inertia : Mat3,
+	prepped_moment_of_inertia : Mat3,
 
 	/// The current linear velocity.
 	pub velocity : Vec3,
@@ -53,8 +47,7 @@ impl InternalEntity {
 
 			own_mass: source.own_mass,
 			total_mass: source.own_mass,
-			moment_of_inertia: Mat3::zeros(),
-			inverse_moment_of_inertia: Mat3::zeros(),
+			prepped_moment_of_inertia: Mat3::zeros(),
 
 			velocity: source.velocity,
 			angular_velocity: source.angular_velocity,
@@ -78,7 +71,7 @@ impl InternalEntity {
 
 			colliders: self.colliders.clone(),
 
-			last_moment_of_inertia: self.moment_of_inertia.clone(),
+			last_prepped_moment_of_inertia: self.prepped_moment_of_inertia.clone(),
 		}
 	}
 
@@ -132,23 +125,16 @@ impl InternalEntity {
 
 		// Then find the moment of inertia relative to the center-of-mass.
 		// Note that everything here is done in WORLD space not local.
-		self.moment_of_inertia = Mat3::zeros();
-		self.inverse_moment_of_inertia = Mat3::zeros();
+		self.prepped_moment_of_inertia = Mat3::zeros();
 		if !found_infinite {
 			// TODO? Do orientation.rotation and angular_velocity need to change since the center-of-mass changed?
 			for handle in self.colliders.iter() {
 				let collider = colliders.get(*handle).unwrap();
-				let offset = self.orientation.position_into_world(&collider.get_local_center_of_mass()) - self.orientation.position;
-				let translated_moment_of_inertia =
-					self.orientation.tensor_into_world(&collider.get_moment_of_inertia_tensor()) +
-					collider.get_mass() * (Mat3::from_diagonal_element(offset.dot(&offset)) - offset * offset.transpose());
-				self.moment_of_inertia += translated_moment_of_inertia;
-			}
-			if let Some(inverse) = self.moment_of_inertia.try_inverse() {
-				self.inverse_moment_of_inertia = inverse;
-			} else {
-				println!("WARNING! No inverse found for moment of inertia!");
-				self.moment_of_inertia = Mat3::zeros();
+				self.prepped_moment_of_inertia += self.orientation.prep_moment_of_inertia(
+					&collider.get_local_center_of_mass(),
+					collider.get_mass(),
+					&collider.get_moment_of_inertia_tensor(),
+				);
 			}
 		}
 	}
@@ -159,8 +145,21 @@ impl InternalEntity {
 	}
 
 	/// Gets the moment of inertia tensor in WORLD space.
+	pub fn get_moment_of_inertia(&self) -> Mat3 {
+		self.orientation.finalize_moment_of_inertia(&self.prepped_moment_of_inertia)
+	}
+
+	/// Gets the moment of inertia tensor in WORLD space.
 	pub fn get_inverse_moment_of_inertia(&self) -> Mat3 {
-		self.inverse_moment_of_inertia
+		let moment = self.get_moment_of_inertia();
+		if let Some(inverse) = moment.try_inverse() {
+			inverse
+		} else {
+			if EPSILON < moment.magnitude() {
+				println!("WARNING! No inverse found for moment of inertia! {:?}", moment);
+			}
+			Mat3::zeros()
+		}
 	}
 
 	/// Gets the velocity at a point (that's specified in world coordinates).
@@ -171,7 +170,7 @@ impl InternalEntity {
 	/// Gets the total energy of this object.
 	pub fn get_total_energy(&self) -> f32 {
 		let linear_energy = (self.total_mass * self.velocity).dot(&self.velocity) / 2.0;
-		let angular_energy = (self.moment_of_inertia * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
+		let angular_energy = (self.get_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
 		linear_energy + angular_energy
 	}
 }
@@ -223,10 +222,10 @@ pub struct Entity {
 	/// Defaults to zero.
 	last_total_mass : f32,
 
-	/// Last known moment of inertia in world space. This is very much read-only.
+	/// Last known moment of inertia in world space (but BEFORE it was rotated according to 'rotation'). This is very much read-only.
 	///
 	/// Defaults to a zero matrix.
-	last_moment_of_inertia : Mat3,
+	last_prepped_moment_of_inertia : Mat3,
 }
 
 impl Entity {
@@ -246,7 +245,7 @@ impl Entity {
 				&Vec3::zeros(),
 			),
 			last_total_mass: 0.0,
-			last_moment_of_inertia: Mat3::zeros(),
+			last_prepped_moment_of_inertia: Mat3::zeros(),
 		}
 	}
 
@@ -276,10 +275,15 @@ impl Entity {
 		)
 	}
 
+	/// Gets the moment of inertia in WORLD space.
+	fn get_last_moment_of_inertia(&self) -> Mat3 {
+		self.make_orientation().finalize_moment_of_inertia(&self.last_prepped_moment_of_inertia)
+	}
+
 	/// Gets the total energy of this object.
 	pub fn get_total_energy(&self) -> f32 {
 		let linear_energy = (self.last_total_mass * self.velocity).dot(&self.velocity) / 2.0;
-		let angular_energy = (self.last_moment_of_inertia * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
+		let angular_energy = (self.get_last_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
 		linear_energy + angular_energy
 	}
 }
