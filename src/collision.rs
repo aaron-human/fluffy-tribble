@@ -1,6 +1,5 @@
 use std::f32::INFINITY;
 
-use crate::consts::EPSILON;
 use crate::types::{Vec3};
 use crate::range::Range;
 use crate::collider::{ColliderType, InternalCollider};

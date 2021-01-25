@@ -254,7 +254,7 @@ impl PhysicsSystem {
 		// That should be able to split the world into islands of boxes that collide
 
 		let mut time_left = dt;
-		for iteration in 0..self.iteration_max {
+		for _iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
 			// Will be "done" once no collisions left or run out of iterations.
 

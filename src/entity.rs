@@ -168,6 +168,7 @@ impl InternalEntity {
 	}
 
 	/// Gets the total energy of this object.
+	#[allow(dead_code)]
 	pub fn get_total_energy(&self) -> f32 {
 		let linear_energy = (self.total_mass * self.velocity).dot(&self.velocity) / 2.0;
 		let angular_energy = (self.get_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;

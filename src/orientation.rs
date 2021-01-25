@@ -160,12 +160,12 @@ mod tests {
 		}
 	}
 
-	fn point_moment_of_inertia_tensor(point : &Vec3, mass : f32) -> Mat3 {
+	/*fn point_moment_of_inertia_tensor(point : &Vec3, mass : f32) -> Mat3 {
 		let len = point.dot(&point);
 		Mat3::new(
 			len - point.x * point.x,     - point.x * point.y,     - point.x * point.z,
 			    - point.y * point.x, len - point.y * point.y,     - point.y * point.z,
 			    - point.z * point.x,     - point.z * point.y, len - point.z * point.z,
 		).scale(mass)
-	}
+	}*/
 }
