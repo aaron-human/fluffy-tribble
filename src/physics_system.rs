@@ -1013,7 +1013,7 @@ mod tests {
 			{
 				let mut entity = Entity::new();
 				entity.velocity = Vec3::new(0.0, 0.0, -START_LINEAR_VELOCITY);
-				entity.angular_velocity = Vec3::new(0.1, -1.0, 0.1);
+				entity.angular_velocity = Vec3::new(0.1, -1.0, 0.1); // The original bug didn't happen unless the axes were at least slightly skewed in more than one axis.
 				system.update_entity(dual, entity).unwrap();
 				//
 				let mut entity = Entity::new();
