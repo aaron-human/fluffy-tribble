@@ -99,3 +99,25 @@ m_k * (\overrightarrow{v_k} \bullet \widehat{n})^2 + ... &=& m_k * [(\overrighta
 \vspace{10} \\
 mag &=& \frac{-2(\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n}}{m_1^{-1} + m_2^{-1}}
 ```
+
+## linear_restitution_solve
+```latex
+\overrightarrow{0} &=& \overrightarrow{v_1}' \bullet \widehat{n} - \overrightarrow{v_2}' \bullet \widehat{n} \\
+\vspace{10} \\
+\overrightarrow{0} &=& (\overrightarrow{v_1} \bullet \widehat{n} + m_1^{-1} * mag) - (\overrightarrow{v_2} \bullet \widehat{n} - m_2^{-1} * mag) \\
+\vspace{10} \\
+\overrightarrow{0} &=& (\overrightarrow{v_1} \bullet \widehat{n} - \overrightarrow{v_2} \bullet \widehat{n}) + (m_1^{-1} + m_2^{-1}) * mag \\
+\vspace{10} \\
+\overrightarrow{0} &=& (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} + (m_1^{-1} + m_2^{-1}) * \frac{-2(\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n}}{m_1^{-1} + m_2^{-1}} \\
+\vspace{10} \\
+\overrightarrow{0} &=& (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} - 2(\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n}
+```
+
+## linear_final_mag
+```latex
+\begin{cases}
+mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n}}{m_1^{-1} + m_2^{-1}} \\
+\overrightarrow{v_1}' = \overrightarrow{v_1} + m_1^{-1} * mag * \widehat{n} \\
+\overrightarrow{v_2}' = \overrightarrow{v_2} - m_2^{-1} * mag * \widehat{n} \\
+\end{cases}
+```

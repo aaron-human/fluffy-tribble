@@ -127,51 +127,13 @@ Now, since the collision must change the object trajectory to prevent them from 
 
 ![linear energy solving part 4](./img/linear_energy_solve_part4.png)
 
-```
-0.5 * m_1 * (iv_1 dot normal) ^ 2 + 0.5 * m_2 * (iv_2 dot normal) ^ 2 = 0.5 * m_1 * (fv_1 dot normal) ^ 2 + 0.5 * m_2 * (fv_2 dot normal) ^ 2
----
-m_1 * (iv_1 dot normal) ^ 2 + m_2 * (iv_2 dot normal) ^ 2 = m_1 * (fv_1 dot normal) ^ 2 + m_2 * (fv_2 dot normal) ^ 2
----
-m_1 * (iv_1 dot normal) ^ 2 + m_2 * (iv_2 dot normal) ^ 2 = m_1 * (iv_1 dot normal + impulse_magnitude) ^ 2 + m_2 * (iv_2 dot normal - impulse_magnitude) ^ 2
----
-m_1 * (iv_1 dot normal) ^ 2 + m_2 * (iv_2 dot normal) ^ 2 = m_1 * ((iv_1 dot normal) ^ 2 + 2 * impulse_magnitude * (iv_1 dot normal) + impulse_magnitude ^ 2) + m_2 * ((iv_2 dot normal) ^ 2 - 2 * impulse_magnitude * (iv_2 dot normal) + impulse_magnitude ^ 2)
----
-0 = m_1 * (2 * impulse_magnitude * (iv_1 dot normal) + impulse_magnitude ^ 2) + m_2 * (-2 * impulse_magnitude * (iv_2 dot normal) + impulse_magnitude ^ 2)
----
-0 = m_1 * (2 * impulse_magnitude * (iv_1 dot normal) + impulse_magnitude ^ 2) + m_2 * (-2 * impulse_magnitude * (iv_2 dot normal) + impulse_magnitude ^ 2)
----
-0 = (m_1 * (2 * (iv_1 dot normal) + impulse_magnitude) + m_2 * (-2 * (iv_2 dot normal) + impulse_magnitude)) * impulse_magnitude
-```
+With that equation elastic collisions are set. But it's not yet clear how to integrate the `restitution_coefficient` into it. So let's see how it could be made to turn the velocity between the two (along the normal) zero:
 
-Since the collision must change something to prevent objects from sliding into each other, `impulse_magnitude` cannot be zero. So it can be divided out.
+![linear restitution solving](./img/linear_restitution_solve.png)
 
-```
-0 = (m_1 * (2 * (iv_1 dot normal) + impulse_magnitude) + m_2 * (-2 * (iv_2 dot normal) + impulse_magnitude)) * impulse_magnitude
----
-0 = m_1 * (2 * (iv_1 dot normal) + impulse_magnitude) + m_2 * (-2 * (iv_2 dot normal) + impulse_magnitude)
----
-0 = m_1 * 2 * (iv_1 dot normal) + m_1 * impulse_magnitude - m_2 * 2 * (iv_2 dot normal) + m_2 * impulse_magnitude
----
-0 = m_1 * 2 * (iv_1 dot normal) - m_2 * 2 * (iv_2 dot normal) + m_1 * impulse_magnitude + m_2 * impulse_magnitude
----
--(m_1 * 2 * (iv_1 dot normal) - m_2 * 2 * (iv_2 dot normal)) = m_1 * impulse_magnitude + m_2 * impulse_magnitude
----
--(m_1 * 2 * (iv_1 dot normal) - m_2 * 2 * (iv_2 dot normal)) = (m_1 + m_2) * impulse_magnitude
----
-impulse_magnitude = -2 * (m_1 * (iv_1 dot normal) - m_2 * (iv_2 dot normal)) / (m_1 + m_2)
-```
+So it looks like the `-2` term just has to become `-1` when `restitution_coefficient` is `0`. So the final equations are:
 
-Now for the physics engine it's often nice to be able to set a mass as "infinite" and have that effectively mean that any collision with it will result in it never moving. If that were to happen with the above equation, it'd get an indeterminate `infinity / infinity`. To work against that, everything on the right can be multiplied by `(m_1 ^ -1 * m_2 ^ -1) / (m_1 ^ -1 * m_2 ^ -1)` like so:
-
-```
--2 * (m_1 * (iv_1 dot normal) - m_2 * (iv_2 dot normal)) / (m_1 + m_2) * (m_1 ^ -1 * m_2 ^ -1) / (m_1 ^ -1 * m_2 ^ -1)
----
--2 * ((m_1 * (iv_1 dot normal) - m_2 * (iv_2 dot normal)) *  (m_1 ^ -1 * m_2 ^ -1)) / ((m_1 + m_2) * (m_1 ^ -1 * m_2 ^ -1))
----
--2 * (m_2 ^ -1 * (iv_1 dot normal) - m_1 ^ -1 * (iv_2 dot normal)) / (m_2 ^ -1 + m_1 ^ -1)
-```
-
-**TODO: Fix the above!**
+![linear restitution solving](./img/linear_final_mag.png)
 
 ## Angular Kinetic Motion
 
