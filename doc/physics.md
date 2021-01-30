@@ -6,11 +6,11 @@
 * Basic matrix math (i.e. translations/rotations and how "spaces" are defined by square matrices).
 * General physics engine design (this doc is JUST about the physics, I assume you know how it fits into the rest of the engine).
 
-## General Things
+## 1. General Things
 
 This physics engine is currently based on physical impulses. So it focuses on handling things at a *velocity* level, rather than an *acceleration/force* level. I aimed for this as it seems to make things simpler (i.e. less integration) which also probably makes them a little easier to make stable.
 
-## First: Linear Kinetic Motion
+## 2. Linear Kinetic Motion
 
 First the basics. As Newton first described, a force is defined as:
 
@@ -31,7 +31,7 @@ linear_velocity += linear_acceleration * dt
 linear_position += linear_velocity * dt
 ```
 
-The above is known as "Semi-implicit Euler Integration", and it's generally what games use as its fast and reasonably effective. There are much more accurate ways to do this, but it's possible to get a "good-enough looking" simulation without them.
+The above is known as "Semi-Implicit Euler Integration", and it's generally what games use as its fast and reasonably effective. There are much more accurate ways to do this, but it's possible to get a "good-enough looking" simulation without them.
 
 Though, for this physics engine, the the collision response is baked into the velocity and position. So it's more like:
 
@@ -65,7 +65,7 @@ Unlike energy, momentum is _always_ conserved. Here's the equation for it:
 linear_momentum = mass * linear_velocity
 ```
 
-### Derivation of Collision Response
+### 2.1. Derivation of Linear Collision Response
 
 With all that written out. It's now possible to derive how what `account_for_collisions()` should do when it finds two objects colliding. To keep things simple, we'll start with the case of an elastic collision between two masses. The equation for conserving momentum and energy:
 
@@ -131,23 +131,26 @@ With that equation elastic collisions are set. But it's not yet clear how to int
 
 ![linear restitution solving](./img/linear_restitution_solve.png)
 
-So it looks like the `-2` term just has to become `-1` when `restitution_coefficient` is `0`. So the final equations are:
+So it looks like the `-2` term just has to become `-1` when `restitution_coefficient` is `0`. That leaves the final equations of motion as:
 
 ![linear restitution solving](./img/linear_final_mag.png)
 
-## Angular Kinetic Motion
+## 3. Angular Kinetic Motion
 
 Next up, it's time to talk about rotation. This is really the main reason I'm writing any of this up; I found it difficult to understand so I want to make sure everything still makes sense once it's on paper.
 
-That said, angular motion is very similar to linear motion in how it's calculated. That is to say, any body will be sent through 2-levels of Semi-implicit Euler Integration:
+That said, angular motion is very similar to linear motion in how it's calculated. Which is to say, any body will be sent through 2-levels of Semi-Implicit Euler Integration:
 
 ```
-angular_velocity += angular_acceleration * dt
-angular_displacement = angular_velocity * dt
-angular_position = account_for_collisions(angular_displacement)
+projected_angular_velocity += angular_acceleration * dt
+projected_angular_displacement = angular_velocity * dt
+(final_angular_position, final_angular_velocity) = account_for_collisions(
+	projected_angular_displacement,
+	projected_angular_velocity,
+)
 ```
 
-Note that `angular_position` is just rotation. It's stored as a "Quaternion" internally, though for the sake of this explanation it's easier to think of it as a simple 3D vector (i.e. a series of three scalar values: x, y, and z). This is essentially how it's treated by the physics engine when doing computation. One could probably switch it to use a vector without anything breaking (probably...), though I'm not sure I'll bother to verify that.
+Note that `angular_position` is just rotation. It's stored as a "Quaternion" internally, though for the sake of this explanation it's easier to think of it as a simple 3D vector (i.e. a series of three scalar values: x, y, and z). This is essentially how it's treated by the physics engine when doing computation. One could probably switch it to use a vector without anything breaking (probably... quaternions tend to re-normalize automatically unlike vectors), though I'm not sure I'll bother to verify that.
 
 Now, since it's really non-obvious, vectors encode arbitrary rotations through multiplication:
 
@@ -176,22 +179,22 @@ angular_velocity X offset = linear_velocity
 
 This will become useful later when discussing collisions.
 
-Now back to foundational angular motion concepts. The **center of mass** is important as it's basically the "true center" of the object when it comes to rotations. That is to say, applying a force directly at the center of mass won't cause the object to rotate, because all mass is "balanced" across any line that goes through that point. This is encoded in the above equation's cross product since the cross product between any two parallel vectors is always zero.
+Now back to foundational angular motion concepts. The **center of mass** is important as it's basically the "true center" of the object when it comes to rotations. That is to say, applying a force directly at the center of mass won't cause the object to rotate, because all mass is "balanced" across any line that goes through that point. This is encoded in the above equation as the cross product between any two parallel vectors is always zero.
 
-With that in mind, the next bit of physics that needs introducing is the concept of **moment of inertia**. In a nut-shell, it describes how hard it is to rotate an object about some specific axis. Note that the *specific axis* part is key; whenever a moment of inertia is described in physics contexts it's always about some implicit axis that's been pre-determined. And in that case it always is a scalar value.
+With that in mind, the next bit of physics that needs introducing is the concept of **moment of inertia**. In a nut-shell, it describes how hard it is to rotate an object about some specific axis. Note that the *specific axis* part is key; whenever a moment of inertia is described in physics contexts it's always about some implicit axis that's been pre-determined. As a result it is a *scalar value*.
 
 However, as described above, rotations in the physics engine are going to be about any arbitrary axis, so we need a way to describe all possible moments of inertia. This is done through the **moment of inertia tensor**, which is a 3-by-3 matrix that converts a (unit) vector into its moment of inertia along each cardinal axis. Described visually:
 
 ```
          [# # #]              [n.x]      [ scalar "moment of inertia around n" for the x-axis ]
-         [# # #]         *    [x.y]    = [ scalar "moment of inertia around n" for the y-axis ]
-         [# # #]              [x.z]      [ scalar "moment of inertia around n" for the z-axis ]
-Moment of inertia tensor * some normal = vector of moments of inertia
+         [# # #]         *    [n.y]    = [ scalar "moment of inertia around n" for the y-axis ]
+         [# # #]              [n.z]      [ scalar "moment of inertia around n" for the z-axis ]
+Moment of inertia tensor * some normal =             vector of moments of inertia
 ```
 
 This might seem horribly confusing (and it will become so later on), but for now it actually makes everything really simple, because for any of the simple (i.e. one-dimensional) angular motion equations that require the *scalar* moment of inertia, one can usually just drop in the correct moment of inertia tensor and switch everything else to vectors and everything will just work.
 
-(Though the *correct* moment of inertia tensor is complicated to calculate. And you have to be vary careful to *always* use the center of mass to represent the object. More on that later.)
+(Though the *correct* moment of inertia tensor is complicated to calculate. And you have to be vary careful to *_always_* use the center of mass to represent the object. More on that later.)
 
 So, to bring all this back to the physics engine. The moment of inertia tensor works like this:
 
@@ -221,12 +224,21 @@ Here `dot` means the dot product. As with before, the total energy may or may no
 angular_momentum = moment_of_inertia * angular_velocity
 ```
 
-So now comes the hard part, pulling this all together into some sort of collision response.
+Before diving into the derivation of the collision response, it's worth setting up one last thing: figuring out the _total_ velocity at a point. Since an object could conceivably have it's center of mass completely immobile but be spinning, obviously the angular velocity must contribute something to the value. Luckily this is just as easy as adding the linear and angular velocity equations above together:
 
-### Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
+```
+total_velocity_at_p = linear_velocity_of_center_of_mass + angular_velocity X offset
+total_velocity_at_p = linear_velocity_of_center_of_mass + angular_velocity X (p - center_of_mass)
+```
+
+### 3.1. Derivation of Angular Collision Response
+
+First thing to note is that it **TODO**
+
+### 3.2. Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
 
 **TODO!**
 
-## Then Friction?
+## 4. Then Friction?
 
 TODO!
