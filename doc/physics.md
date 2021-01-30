@@ -91,7 +91,7 @@ So the above become:
 
 ![linear whole system](./img/linear_whole_system.png)
 
-To start, we'll focus on the momentum equation. In order to make the entire system solvable, it's important to realize the two objects will react by moving in opposite directions along the same normal (i.e. Newton's Third Law). However the magnitude of those changes can be different (i.e. imagine a tennis-ball hitting a car; the car won't move much). So the relationship between the initial and final velocities should be:
+To start, we'll focus on the momentum equation. In order to make the entire system solvable, it's important to realize the two objects will react by moving in opposite directions along the same normal (i.e. Newton's Third Law). However the magnitude of those changes can be different (i.e. imagine a tennis ball hitting an asteroid; the asteroid won't move much). So the relationship between the initial and final velocities should be:
 
 ![linear velocities](./img/linear_velocities.png)
 
@@ -103,19 +103,13 @@ Which is most elegantly solved by simply scaling each by the corresponding inver
 
 ![linear velocities updated](./img/linear_velocities_updated.png)
 
+Now, for reasons that will become apparent in a moment, here's what happens when all those values are focused along just the normal:
+
+![linear velocities along normal](./img/linear_velocities_along_normal.png)
+
 And that's really all the inertia equation is good for. So lets now focus on the conservation of energy equation:
 
----
-
 ![linear energy equation 1](./img/linear_energy_eqn1.png)
-
-To make this solvable, we'll simplify the system to only change the velocity in the direction of the normal:
-
-![linear impulse equation 1](./img/linear_impulse_eqn1.png)
-
-The above can then further be modified to focus just on the velocity change in the direction of the normal:
-
-![linear impulse along normal](./img/linear_impulse_along_normal.png)
 
 Now since the velocity will only change along the collision `normal`, and equation equating total energy before and after the collision can drop any energy coming from speed orthogonal to the `normal` as it will never change. So the energy equation becomes:
 
