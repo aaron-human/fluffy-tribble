@@ -59,7 +59,7 @@ linear_kinetic_energy = 0.5 * mass * linear_speed^2
 
 As described above; the total of it in a system can be made to be completely conserved, depending on what the `restitution_coefficients` are set to.
 
-Unlike energy, momentum is _always_ conserved. Though it's not used much in this document, here's the equation for it:
+Unlike energy, momentum is _always_ conserved. Here's the equation for it:
 
 ```
 linear_momentum = mass * linear_velocity
@@ -67,22 +67,45 @@ linear_momentum = mass * linear_velocity
 
 ### Derivation of Collision Response
 
-With all that written out. It's now possible to derive how what `account_for_collisions()` should do when it finds two objects colliding. To keep things simple, we'll start with the case of an elastic collision between two masses. The equation for conserving mass would be:
+With all that written out. It's now possible to derive how what `account_for_collisions()` should do when it finds two objects colliding. To keep things simple, we'll start with the case of an elastic collision between two masses. The equation for conserving momentum and energy:
 
 ```
+mass_1 * initial_velocity_1 + mass_2 * initial_velocity_2 =  mass_1 * final_velocity_1 + mass_2 * final_velocity_2
 0.5 * mass_1 * initial_speed_1 ^ 2 + 0.5 * mass_2 * initial_speed_2 ^ 2 = 0.5 * mass_1 * final_speed_1 ^ 2 + 0.5 * mass_2 * final_speed_2 ^ 2
 ```
 
-To keep things readable, I'm going to shorten the names to:
+Now since these equations are going to get really long, I'm going to rename the variables into something that's easy to display in LaTeX:
 
 * ![m_1](./img/m_1.png) is `mass_1`
 * ![m_2](./img/m_2.png) is `mass_2`
-* ![s_1](./img/s_1.png) is `initial_speed_1`
-* ![s_2](./img/s_2.png) is `initial_speed_2`
-* ![s_1_f](./img/s_1_f.png) is `final_speed_1`
-* ![s_2_f](./img/s_2_f.png) is `final_speed_2`
+* ![v_1](./img/v_1.png) is `initial_velocity_1`
+* ![v_2](./img/v_2.png) is `initial_velocity_2`
+* ![v_1_f](./img/v_1_f.png) is `final_velocity_1`
+* ![v_2_f](./img/v_2_f.png) is `final_velocity_2`
+* ![s_1](./img/s_1.png) is `initial_speed_1` which is the length of `initial_velocity_1`
+* ![s_2](./img/s_2.png) is `initial_speed_2` which is the length of `initial_velocity_2`
+* ![s_1_f](./img/s_1_f.png) is `final_speed_1` which is the length of `final_velocity_1`
+* ![s_2_f](./img/s_2_f.png) is `final_speed_2` which is the length of `final_velocity_2`
 
-So the above becomes:
+So the above become:
+
+![linear whole system](./img/linear_whole_system.png)
+
+To start, we'll focus on the momentum equation. In order to make the entire system solvable, it's important to realize the two objects will react by moving in opposite directions along the same normal (i.e. Newton's Third Law). However the magnitude of those changes can be different (i.e. imagine a tennis-ball hitting a car; the car won't move much). So the relationship between the initial and final velocities should be:
+
+![linear velocities](./img/linear_velocities.png)
+
+To solve for the relationship between these two magnitudes, we'll plug them into the momentum equation:
+
+![liner momentum equations](./img/linear_momentum_eqn1.png)
+
+Which is most elegantly solved by simply scaling each by the corresponding inverse mass term. This updates the velocity equations to:
+
+![linear velocities updated](./img/linear_velocities_updated.png)
+
+And that's really all the inertia equation is good for. So lets now focus on the conservation of energy equation:
+
+---
 
 ![linear energy equation 1](./img/linear_energy_eqn1.png)
 
