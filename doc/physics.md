@@ -38,7 +38,10 @@ Though, for this physics engine, the the collision response is baked into the ve
 ```
 projected_linear_velocity += linear_acceleration * dt
 projected_linear_displacement = projected_linear_velocity * dt
-(final_linear_position, final_linear_velocity) = account_for_collisions(projected_linear_displacement, projected_linear_velocity)
+(final_linear_position, final_linear_velocity) = account_for_collisions(
+	projected_linear_displacement,
+	projected_linear_velocity,
+)
 ```
 
 Next it's important to understand one way in which collisions can be characterized:
@@ -85,26 +88,11 @@ So the above becomes:
 
 To make this solvable, we'll simplify the system to only change the velocity in the direction of the normal:
 
-```
-fv_1 = iv_1 + normal * impulse_magnitude
-fv_2 = iv_2 - normal * impulse_magnitude
-```
+![linear impulse equation 1](./img/linear_impulse_eqn1.png)
 
 The above can then further be modified to focus just on the velocity change in the direction of the normal:
 
-```
-fv_1 = iv_1 + normal * impulse_magnitude
-fv_2 = iv_2 - normal * impulse_magnitude
----
-fv_1 dot normal = (iv_1 + normal * impulse_magnitude) dot normal
-fv_2 dot normal = (iv_2 - normal * impulse_magnitude) dot normal
----
-fv_1 dot normal = iv_1 dot normal + normal * impulse_magnitude dot normal
-fv_2 dot normal = iv_2 dot normal - normal * impulse_magnitude dot normal
----
-fv_1 dot normal = iv_1 dot normal + impulse_magnitude
-fv_2 dot normal = iv_2 dot normal - impulse_magnitude
-```
+![linear impulse along normal](./img/linear_impulse_along_normal.png)
 
 Now since the velocity will only change along the collision `normal`, and equation equating total energy before and after the collision can drop any energy coming from speed orthogonal to the `normal` as it will never change. So the energy equation becomes:
 
