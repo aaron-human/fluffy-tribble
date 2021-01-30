@@ -96,6 +96,20 @@ The above can then further be modified to focus just on the velocity change in t
 
 Now since the velocity will only change along the collision `normal`, and equation equating total energy before and after the collision can drop any energy coming from speed orthogonal to the `normal` as it will never change. So the energy equation becomes:
 
+![linear energy solving part 1](./img/linear_energy_solve_part1.png)
+
+Each squared term on the right can be expanded, and then cancel with a term on the right:
+
+![linear energy solving part 2](./img/linear_energy_solve_part2.png)
+
+So the whole equation becomes:
+
+![linear energy solving part 3](./img/linear_energy_solve_part3.png)
+
+Now, since the collision must change the object trajectory to prevent them from sliding into one another, the `impulse_magnitude`/!['mag' variable](./img/mag.png) cannot be zero. So it's safe to divide it out.
+
+![linear energy solving part 4](./img/linear_energy_solve_part4.png)
+
 ```
 0.5 * m_1 * (iv_1 dot normal) ^ 2 + 0.5 * m_2 * (iv_2 dot normal) ^ 2 = 0.5 * m_1 * (fv_1 dot normal) ^ 2 + 0.5 * m_2 * (fv_2 dot normal) ^ 2
 ---
