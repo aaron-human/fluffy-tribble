@@ -89,7 +89,7 @@ Now since these equations are going to get really long, I'm going to rename the 
 
 So the above become:
 
-<img alt="linear whole system" src="./img/linear_whole_system.png" style="filter:invert(1)" />
+<img alt="linear whole system" src="./img/linear_whole_system.white.png" style="mix-blend-mode: exclusion;" />
 
 To start, we'll focus on the momentum equation. In order to make the entire system solvable, it's important to realize the two objects will react by moving in opposite directions along the same normal (i.e. Newton's Third Law). However the magnitude of those changes can be different (i.e. imagine a tennis ball hitting an asteroid; the asteroid won't move much). So the relationship between the initial and final velocities should be:
 
