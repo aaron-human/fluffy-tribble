@@ -221,7 +221,7 @@ energy = 0.5 * (moment_of_inertia_tensor * angular_velocity) dot angular_velocit
 Here `dot` means the dot product. As with before, the total energy may or may not be conserved depending on the `restitution_coefficient`. Oppositely, the angular momentum is always conserved in a collision:
 
 ```
-angular_momentum = moment_of_inertia * angular_velocity
+angular_momentum = moment_of_inertia_tensor * angular_velocity
 ```
 
 Before diving into the derivation of the collision response, it's worth setting up one last thing: figuring out the _total_ velocity at a point. Since an object could conceivably have it's center of mass completely immobile but be spinning, obviously the angular velocity must contribute something to the value. Luckily this is just as easy as adding the linear and angular velocity equations above together:
@@ -233,11 +233,45 @@ total_velocity_at_p = linear_velocity_of_center_of_mass + angular_velocity X (p 
 
 ### 3.1. Derivation of Angular Collision Response
 
+First things first, to keep things readable, here are how all of the above verbose names map to single-letter counterparts:
+
+* ![I_1](./img/I_1.png) is the `moment_of_inertia_tensor` for body 1.
+* ![I_2](./img/I_2.png) is the `moment_of_inertia_tensor` for body 2.
+* ![w_1](./img/w_1.png) is the `angular_velocity` for body 1 before the collision response.
+* ![w_2](./img/w_2.png) is the `angular_velocity` for body 2 before the collision response.
+* ![w_1_f](./img/w_1_f.png) is the `angular_velocity` for body 1 after the collision response.
+* ![w_2_f](./img/w_2_f.png) is the `angular_velocity` for body 2 after the collision response.
+* ![p_1](./img/p_1.png) is the vector from the center of mass for body 1 to the point of collision.
+* ![p_2](./img/p_2.png) is the vector from the center of mass for body 2 to the point of collision.
+
+With that lets first examine how angular momentum is conserved:
+
+![angular momentum conserved](./img/angular_momenum_conserved.png)
+
+The collision response force will continue to occur along the collision's normal, so the change in angular velocities can be modeled as:
+
+![angular momentum change equations](./img/angular_momenum_changes.png)
+
+All of this should look pretty similar to the linear case, so you can probably guess how the changes will be scaled. But here's the full derivation:
+
+![angular momentum distributed](./img/angular_momentum_distributed.png)
+
+So the change in momentum equations can be updated to:
+
+![angular momentum change equations updated](./img/angular_momenum_changes_updated.png)
+
+
 First thing to note is that it **TODO**
 
 ### 3.2. Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
 
 **TODO!**
+
+Pitfalls:
+
+* The tensors are ORIENTED. So in order to use them, must translate and rotate them into world space first! The easiest way I found to do this was to setup something that just handles storing the orientation info.
+* Can only use the "parallel axis" equations ONCE when shifting away. To use them, the original tensor MUST be centered about the center-of-mass.
+* There's a weird feed-back between storing the object's position as the center of mass and recalculating the center of mass?
 
 ## 4. Then Friction?
 

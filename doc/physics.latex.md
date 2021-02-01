@@ -121,3 +121,32 @@ mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarro
 \overrightarrow{v_2}' = \overrightarrow{v_2} - m_2^{-1} * mag * \widehat{n} \\
 \end{cases}
 ```
+
+## angular_momentum_conserved
+```latex
+I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 = I_1 * \overrightarrow{\omega}_1' + I_2 * \overrightarrow{\omega}_2'
+```
+
+## angular_momenum_changes
+```latex
+\begin{cases}
+\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + \Delta_1 * \widehat{n} \\
+\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - \Delta_2 * \widehat{n}
+\end{cases}
+```
+
+## angular_momentum_distributed
+```latex
+I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * \overrightarrow{\omega}_1' + I_2 * \overrightarrow{\omega}_2' \\
+I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * (\overrightarrow{\omega}_1 + \Delta_1 * \widehat{n}) + I_2 * (\overrightarrow{\omega}_2 - \Delta_2 * \widehat{n}) \\
+\overrightarrow{0} &=& I_1 * \Delta_1 * \widehat{n} - I_2 * \Delta_2 * \widehat{n} \\
+I_1 * \Delta_1 * \widehat{n} &=& I_2 * \Delta_2 * \widehat{n}
+```
+
+## angular_momenum_changes_updated
+```latex
+\begin{cases}
+\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \widehat{n} * \Delta \\
+\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - I_2^{-1} * \widehat{n} * \Delta
+\end{cases}
+```
