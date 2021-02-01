@@ -246,11 +246,11 @@ First things first, to keep things readable, here are how all of the above verbo
 
 With that lets first examine how angular momentum is conserved:
 
-![angular momentum conserved](./img/angular_momenum_conserved.png)
+![angular momentum conserved](./img/angular_momentum_conserved.png)
 
 The collision response force will continue to occur along the collision's normal, so the change in angular velocities can be modeled as:
 
-![angular momentum change equations](./img/angular_momenum_changes.png)
+![angular momentum change equations](./img/angular_momentum_changes.png)
 
 All of this should look pretty similar to the linear case, so you can probably guess how the changes will be scaled. But here's the full derivation:
 
@@ -258,7 +258,7 @@ All of this should look pretty similar to the linear case, so you can probably g
 
 So the change in momentum equations can be updated to:
 
-![angular momentum change equations updated](./img/angular_momenum_changes_updated.png)
+![angular momentum change equations updated](./img/angular_momentum_changes_updated.png)
 
 
 First thing to note is that it **TODO**
