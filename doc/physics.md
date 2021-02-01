@@ -217,11 +217,7 @@ energy = 0.5 * moment_of_inertia_about_angular_velocity * angular_velocity_magni
 energy = 0.5 * (moment_of_inertia_tensor * angular_velocity) dot angular_velocity
 ```
 
-Here `dot` means the dot product. As with before, the total energy may or may not be conserved depending on the `restitution_coefficient`. Oppositely, the angular momentum is always conserved in a collision:
-
-```
-angular_momentum = moment_of_inertia_tensor * angular_velocity
-```
+Here `dot` means the dot product. As with before, the total energy may or may not be conserved depending on the `restitution_coefficient`.
 
 Before diving into the derivation of the collision response, it's worth setting up one last thing: figuring out the _total_ velocity at a point. Since an object could conceivably have it's center of mass completely immobile but be spinning, obviously the angular velocity must contribute something to the value. Luckily this is just as easy as adding the linear and angular velocity equations above together:
 
@@ -248,6 +244,8 @@ With that lets first examine how angular momentum is conserved:
 ![angular momentum conserved](./img/angular_momentum_conserved.png)
 
 The collision response force will continue to occur along the collision's normal, so the change in angular velocities can be modeled as:
+
+**TODO:** The below is wrong. Angular momentum is conserved IF ALL momentum is calculated about a single point. So can't do the below... No wonder everything looked super weird.
 
 ![angular momentum change equations](./img/angular_momentum_changes.png)
 
