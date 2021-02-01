@@ -130,23 +130,23 @@ I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 = I_1 * \overr
 ## angular_momenum_changes
 ```latex
 \begin{cases}
-\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + \Delta_1 * \widehat{n} \\
-\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - \Delta_2 * \widehat{n}
+\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + \Delta_1 * \widehat{n} \times \widehat{p}_1 \\
+\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - \Delta_2 * \widehat{n} \times \widehat{p}_2
 \end{cases}
 ```
 
 ## angular_momentum_distributed
 ```latex
 I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * \overrightarrow{\omega}_1' + I_2 * \overrightarrow{\omega}_2' \\
-I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * (\overrightarrow{\omega}_1 + \Delta_1 * \widehat{n}) + I_2 * (\overrightarrow{\omega}_2 - \Delta_2 * \widehat{n}) \\
-\overrightarrow{0} &=& I_1 * \Delta_1 * \widehat{n} - I_2 * \Delta_2 * \widehat{n} \\
-I_1 * \Delta_1 * \widehat{n} &=& I_2 * \Delta_2 * \widehat{n}
+I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * (\overrightarrow{\omega}_1 + \Delta_1 * \widehat{n} \times \widehat{p}_1) + I_2 * (\overrightarrow{\omega}_2 - \Delta_2 * \widehat{n} \times \widehat{p}_2) \\
+\overrightarrow{0} &=& I_1 * \Delta_1 * \widehat{n} \times \widehat{p}_1 - I_2 * \Delta_2 * \widehat{n} \times \widehat{p}_2 \\
+I_1 * \Delta_1 * \widehat{n} \times \widehat{p}_1 &=& I_2 * \Delta_2 * \widehat{n} \times \widehat{p}_2
 ```
 
 ## angular_momenum_changes_updated
 ```latex
 \begin{cases}
-\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \widehat{n} * \Delta \\
-\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - I_2^{-1} * \widehat{n} * \Delta
+\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \Delta * \widehat{n} \times \widehat{p}_1 \\
+\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - I_2^{-1} * \Delta * \widehat{n} \times \widehat{p}_2 
 \end{cases}
 ```

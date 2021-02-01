@@ -165,7 +165,7 @@ So the vector's direction is the axis of rotation, and it's length is how much t
 Now with that, it's next important to understand how linear energy is moved into rotation. That is to say, it's time to start using cross product. Now if a force is applied to an object, then it can rotate the object by producing a torque, which is calculated by:
 
 ```
-torque = force_vector X offset
+torque = offset X force_vector
 ```
 
 Here the `X` means **cross product**, and the `offset` is the vector from the object's **center of mass** to the point where the force is being applied. (More on why the center of mass is important soon.) The torque is basically the rotational equivalent to a linear force.
@@ -173,8 +173,7 @@ Here the `X` means **cross product**, and the `offset` is the vector from the ob
 Notably the cross product can also be used to convert the angular velocity of an object into the linear velocity at a specific point:
 
 ```
-angular_velocity = linear_velocity X offset
-angular_velocity X offset = linear_velocity
+angular_velocity X (p - center_of_mass) = linear_velocity_at_p
 ```
 
 This will become useful later when discussing collisions.
