@@ -187,7 +187,7 @@ m_1 * s_1^2 + m_2 * s_2^2 + (I_1 * \overrightarrow{\omega}_1) \bullet \overright
 
 ## angular_energy_eqn4
 ```latex
-(I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k + ... &=& (I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
+(I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k + ... &=& ... + (I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
 \vspace{10} \\
-0 + ... &=& \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
+0 + ... &=& ... \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
 ```
