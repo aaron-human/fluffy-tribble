@@ -246,13 +246,13 @@ First thing's first, the force that affects the angular velocity applied will be
 
 ![angular accelerations](./img/angular_accelerations.png)
 
-Now to get how the acceleration will affect the angular velocity, the equations need to be integrated. So assuming the force is applied over a short period of time (so the offset to the collision doesn't move), the overall change in velocity becomes:
+Now to get how the acceleration will affect the angular velocity, the equations need to be integrated. So assuming the force is applied over a short period of time (so the offset to the collision doesn't move and the moment of inertia tensors don't need to be reoriented), the overall change in velocity becomes:
 
 ![angular impulses](./img/angular_impulses.png)
 
 Where the lower-case `f` is an unknown magnitude. Adding the before and after angular velocities gets:
 
-![angular momentum changes](./img/angular_momenum_changes.png)
+![angular momentum changes](./img/angular_momentum_changes.png)
 
 With that it's now possible to solve for `f` when the collision is elastic by plugging the above into the total system energy equation:
 
