@@ -148,7 +148,7 @@ mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarro
 \end{cases}
 ```
 
-## angular_momenum_changes
+## angular_velocity_changes
 ```latex
 \begin{cases}
 \overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \overrightarrow{p}_1 \times (f * \widehat{n}) \\
@@ -156,12 +156,23 @@ mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarro
 \end{cases}
 ```
 
+## linear_velocity_changes_v2
+```latex
+\begin{cases}
+\overrightarrow{v_1}' = \overrightarrow{v_1} + m_1^{-1} * (f * \widehat{n}) \\
+\overrightarrow{v_2}' = \overrightarrow{v_2} - m_2^{-1} * (f * \widehat{n}) \\
+\end{cases}
+```
+
 ## angular_energy_eqn1
 ```latex
-\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1}{2} + \frac{(I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2}{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1'}{2} + \frac{(I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'}{2}
+\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1}{2} + \frac{(I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2}{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1'}{2} + \frac{(I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'}{2} \\
+\vspace{10} \\
+m_1 * s_1^2 + m_2 * s_2^2 + (I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1 + (I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2 &=& m_1 * s_1'^2 + m_2 * s_2'^2 + (I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1' + (I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'
 ```
 
 ## angular_energy_eqn2
 ```latex
-\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1}{2} + \frac{(I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2}{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1'}{2} + \frac{(I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'}{2}
+[0] + (I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1 + (I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2 &=& [2 * f * (\overrightarrow{v_1} \bullet \widehat{n}) + m_1^{-1} * f^2 - 2 * f * (\overrightarrow{v_2} \bullet \widehat{n}) + m_2^{-1}] * f^2 + (I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1' + (I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'
 ```
+

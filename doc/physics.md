@@ -252,13 +252,23 @@ Now to get how the acceleration will affect the angular velocity, the equations 
 
 Where the lower-case `f` is an unknown magnitude. Adding the before and after angular velocities gets:
 
-![angular momentum changes](./img/angular_momentum_changes.png)
+![angular velocity changes](./img/angular_velocity_changes.png)
+
+Now one thing to know about `f` is that it's (basically) a stand in for the impulse applied at the point of collision. That means it takes the same place as `mag` took for the linear velocity changes:
+
+![linear velocity changes version 2](./img/linear_velocity_changes_v2.png)
 
 With that it's now possible to solve for `f` when the collision is elastic by plugging the above into the total system energy equation:
 
 ![angular energy eqn1](./img/angular_energy_eqn1.png)
 
-Now the above equation is a bit hefty, even with single-letter variables, so it's best to attack it in pieces:
+Now the above equation is a bit hefty, even with single-letter variables, so it's best to attack it in pieces. First off, the same procedure used in the linear section can be applied to cut down the linear kinetic energy terms:
+
+![angular energy eqn2](./img/angular_energy_eqn2.png)
+
+Then the angular kinetic energy can receive a similar treatment:
+
+![angular energy eqn3](./img/angular_energy_eqn3.png)
 
 **TODO**
 
