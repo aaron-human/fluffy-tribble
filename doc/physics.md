@@ -269,6 +269,7 @@ Now the above equation is a bit hefty, even with single-letter variables, so it'
 Then the angular kinetic energy can receive a similar treatment:
 
 ![angular energy eqn3](./img/angular_energy_eqn3.png)
+![angular energy eqn4](./img/angular_energy_eqn4.png)
 
 **TODO**
 

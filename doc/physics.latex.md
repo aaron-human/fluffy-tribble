@@ -173,6 +173,21 @@ m_1 * s_1^2 + m_2 * s_2^2 + (I_1 * \overrightarrow{\omega}_1) \bullet \overright
 
 ## angular_energy_eqn2
 ```latex
-[0] + (I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1 + (I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2 &=& [2 * f * (\overrightarrow{v_1} \bullet \widehat{n}) + m_1^{-1} * f^2 - 2 * f * (\overrightarrow{v_2} \bullet \widehat{n}) + m_2^{-1}] * f^2 + (I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1' + (I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'
+[0] + (I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1 + (I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2 &=& [2 * f * (\overrightarrow{v_1} \bullet \widehat{n}) + m_1^{-1} * f^2 - 2 * f * (\overrightarrow{v_2} \bullet \widehat{n}) + m_2^{-1} * f^2] + (I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1' + (I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'
 ```
 
+## angular_energy_eqn3
+```latex
+(I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k + ... &=& ... + (I_k * \overrightarrow{\omega}_k') \bullet \overrightarrow{\omega}_k' \\
+\vspace{10} \\
+&=& ... + [I_k * (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
+\vspace{10} \\
+&=& ... + [I_k * \overrightarrow{\omega}_k \pm \overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
+```
+
+## angular_energy_eqn4
+```latex
+(I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k + ... &=& (I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
+\vspace{10} \\
+0 + ... &=& \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet \overrightarrow{\omega}_k \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
+```
