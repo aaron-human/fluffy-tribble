@@ -205,7 +205,7 @@ Which can be rearranged to get the needed value:
 
 ```
 angular_acceleration = inverse_moment_of_inertia_tensor * torque
-angular_acceleration = inverse_moment_of_inertia_tensor * (force_vector X offset)
+angular_acceleration = inverse_moment_of_inertia_tensor * (offset X force_vector)
 ```
 
 So now there's a way to go from a forces applied to the surface to angular acceleration.
@@ -238,27 +238,29 @@ First things first, to keep things readable, here are how all of the above verbo
 * ![w_2_f](./img/w_2_f.png) is the `angular_velocity` for body 2 after the collision response.
 * ![p_1](./img/p_1.png) is the vector from the center of mass for body 1 to the point of collision.
 * ![p_2](./img/p_2.png) is the vector from the center of mass for body 2 to the point of collision.
+* ![F](./img/F.png) is the force applied on body 1.
+* ![alpha_1](./img/alpha_1.png) is the angular acceleration on body 1.
+* ![alpha_2](./img/alpha_2.png) is the angular acceleration on body 2.
 
-With that lets first examine how angular momentum is conserved:
+First thing's first, the force that affects the angular velocity applied will be along the normal, but in opposite directions for the two bodies. So the angular accelerations would be:
 
-![angular momentum conserved](./img/angular_momentum_conserved.png)
+![angular accelerations](./img/angular_accelerations.png)
 
-The collision response force will continue to occur along the collision's normal, so the change in angular velocities can be modeled as:
+Now to get how the acceleration will affect the angular velocity, the equations need to be integrated. So assuming the force is applied over a short period of time (so the offset to the collision doesn't move), the overall change in velocity becomes:
 
-**TODO:** The below is wrong. Angular momentum is conserved IF ALL momentum is calculated about a single point. So can't do the below... No wonder everything looked super weird.
+![angular impulses](./img/angular_impulses.png)
 
-![angular momentum change equations](./img/angular_momentum_changes.png)
+Where the lower-case `f` is an unknown magnitude. Adding the before and after angular velocities gets:
 
-All of this should look pretty similar to the linear case, so you can probably guess how the changes will be scaled. But here's the full derivation:
+![angular momentum changes](./img/angular_momenum_changes.png)
 
-![angular momentum distributed](./img/angular_momentum_distributed.png)
+With that it's now possible to solve for `f` when the collision is elastic by plugging the above into the total system energy equation:
 
-So the change in momentum equations can be updated to:
+![angular energy eqn1](./img/angular_energy_eqn1.png)
 
-![angular momentum change equations updated](./img/angular_momentum_changes_updated.png)
+Now the above equation is a bit hefty, even with single-letter variables, so it's best to attack it in pieces:
 
-
-First thing to note is that it **TODO**
+**TODO**
 
 ### 3.2. Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
 

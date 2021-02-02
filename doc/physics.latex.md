@@ -122,31 +122,46 @@ mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarro
 \end{cases}
 ```
 
-## angular_momentum_conserved
+## angular_accelerations
 ```latex
-I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 = I_1 * \overrightarrow{\omega}_1' + I_2 * \overrightarrow{\omega}_2'
+\begin{cases}
+\overrightarrow{\alpha}_1' = I_1^{-1} * \overrightarrow{p}_1 \times \overrightarrow{F} \\
+\overrightarrow{\alpha}_2' = I_2^{-1} * \overrightarrow{p}_2 \times (-{\overrightarrow{F}})
+\end{cases}
+```
+
+## angular_impulses
+```latex
+&& \begin{cases}
+\int_{\Delta t} \overrightarrow{\alpha}_1' dt = \int_{\Delta t} I_1^{-1} * \overrightarrow{p}_1 \times \overrightarrow{F} dt \\
+\int_{\Delta t} \overrightarrow{\alpha}_2' dt = \int_{\Delta t} I_2^{-1} * \overrightarrow{p}_2 \times (-{\overrightarrow{F}}) dt
+\end{cases} \\
+\vspace{10} \\
+&& \begin{cases}
+\Delta \overrightarrow{\omega}_1 = I_1^{-1} * \overrightarrow{p}_1 \times \int_{\Delta t} \overrightarrow{F} dt \\
+\Delta \overrightarrow{\omega}_2 = I_2^{-1} * \overrightarrow{p}_2 \times \int_{\Delta t} (-{\overrightarrow{F}}) dt
+\end{cases} \\
+\vspace{10} \\
+&& \begin{cases}
+\Delta \overrightarrow{\omega}_1 = I_1^{-1} * \overrightarrow{p}_1 \times (f * \widehat{n}) \\
+\Delta \overrightarrow{\omega}_2 = - I_2^{-1} * \overrightarrow{p}_2 \times (f * \widehat{n})
+\end{cases}
 ```
 
 ## angular_momenum_changes
 ```latex
 \begin{cases}
-\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + \overrightarrow{p}_1 \times (\Delta_1 * \widehat{n}) \\
-\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - \overrightarrow{p}_2 \times (\Delta_2 * \widehat{n})
+\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \overrightarrow{p}_1 \times (f * \widehat{n}) \\
+\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - I_2^{-1} * \overrightarrow{p}_2 \times (f * \widehat{n})
 \end{cases}
 ```
 
-## angular_momentum_distributed
+## angular_energy_eqn1
 ```latex
-I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * \overrightarrow{\omega}_1' + I_2 * \overrightarrow{\omega}_2' \\
-I_1 * \overrightarrow{\omega}_1 + I_2 * \overrightarrow{\omega}_2 &=& I_1 * (\overrightarrow{\omega}_1 + \Delta_1 * \widehat{n} \times \widehat{p}_1) + I_2 * (\overrightarrow{\omega}_2 - \Delta_2 * \widehat{n} \times \widehat{p}_2) \\
-\overrightarrow{0} &=& I_1 * \Delta_1 * \widehat{n} \times \widehat{p}_1 - I_2 * \Delta_2 * \widehat{n} \times \widehat{p}_2 \\
-I_1 * \Delta_1 * \widehat{n} \times \widehat{p}_1 &=& I_2 * \Delta_2 * \widehat{n} \times \widehat{p}_2
+\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1}{2} + \frac{(I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2}{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1'}{2} + \frac{(I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'}{2}
 ```
 
-## angular_momenum_changes_updated
+## angular_energy_eqn2
 ```latex
-\begin{cases}
-\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \Delta * \widehat{n} \times \widehat{p}_1 \\
-\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - I_2^{-1} * \Delta * \widehat{n} \times \widehat{p}_2
-\end{cases}
+\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1}{2} + \frac{(I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2}{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1'}{2} + \frac{(I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'}{2}
 ```
