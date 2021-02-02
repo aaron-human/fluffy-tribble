@@ -125,16 +125,16 @@ mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarro
 ## angular_accelerations
 ```latex
 \begin{cases}
-\overrightarrow{\alpha}_1' = I_1^{-1} * \overrightarrow{p}_1 \times \overrightarrow{F} \\
-\overrightarrow{\alpha}_2' = I_2^{-1} * \overrightarrow{p}_2 \times (-{\overrightarrow{F}})
+\overrightarrow{\alpha}_1 = I_1^{-1} * \overrightarrow{p}_1 \times \overrightarrow{F} \\
+\overrightarrow{\alpha}_2 = I_2^{-1} * \overrightarrow{p}_2 \times (-{\overrightarrow{F}})
 \end{cases}
 ```
 
 ## angular_impulses
 ```latex
 && \begin{cases}
-\int_{\Delta t} \overrightarrow{\alpha}_1' dt = \int_{\Delta t} I_1^{-1} * \overrightarrow{p}_1 \times \overrightarrow{F} dt \\
-\int_{\Delta t} \overrightarrow{\alpha}_2' dt = \int_{\Delta t} I_2^{-1} * \overrightarrow{p}_2 \times (-{\overrightarrow{F}}) dt
+\int_{\Delta t} \overrightarrow{\alpha}_1 dt = \int_{\Delta t} I_1^{-1} * \overrightarrow{p}_1 \times \overrightarrow{F} dt \\
+\int_{\Delta t} \overrightarrow{\alpha}_2 dt = \int_{\Delta t} I_2^{-1} * \overrightarrow{p}_2 \times (-{\overrightarrow{F}}) dt
 \end{cases} \\
 \vspace{10} \\
 && \begin{cases}
