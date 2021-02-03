@@ -191,5 +191,21 @@ m_1 * s_1^2 + m_2 * s_2^2 + (I_1 * \overrightarrow{\omega}_1) \bullet \overright
 \vspace{10} \\
 0 + ... &=& ... \pm (I_k * \overrightarrow{\omega}_k) \bullet [I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})] \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
 \vspace{10} \\
-0 + ... &=& ... ???
+```
+
+```latex
+0 + ... &=& ... \pm (I_k * \overrightarrow{\omega}_k) \bullet [I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})] \pm \overrightarrow{\omega}_k \bullet [\overrightarrow{p}_k \times (f * \widehat{n})] + [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
+```
+
+## angular_final_solution
+```latex
+\begin{cases}
+\overrightarrow{v}_{t1} = \overrightarrow{v_1} + \overrightarrow{\omega}_1 X \overrightarrow{p}_1 \\
+\overrightarrow{v}_{t2} = \overrightarrow{v_2} + \overrightarrow{\omega}_2 X \overrightarrow{p}_2 \\
+f = \cfrac{-(1 + restitution\_cofficient)(\overrightarrow{v}_{t1} - \overrightarrow{v}_{t2}) \bullet \widehat{n}}{m_1^{-1} + m_2^{-1} + [I_1^{-1} (\overrightarrow{p}_1 \times \widehat{n}) \times \overrightarrow{p}_1 + I_2^{-1} (\overrightarrow{p}_2 \times \widehat{n}) \times \overrightarrow{p}_2] \bullet \widehat{n}} \\
+\overrightarrow{v_1}' = \overrightarrow{v_1} + m_1^{-1} * f * \widehat{n} \\
+\overrightarrow{v_2}' = \overrightarrow{v_2} - m_2^{-1} * f * \widehat{n} \\
+\overrightarrow{\omega}_1' = \overrightarrow{\omega}_1 + I_1^{-1} * \overrightarrow{p}_1 \times (f * \widehat{n}) \\
+\overrightarrow{\omega}_2' = \overrightarrow{\omega}_2 - I_2^{-1} * \overrightarrow{p}_2 \times (f * \widehat{n})
+\end{cases}
 ```

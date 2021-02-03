@@ -271,7 +271,11 @@ Then the angular kinetic energy can receive a similar treatment:
 ![angular energy eqn3](./img/angular_energy_eqn3.png)
 ![angular energy eqn4](./img/angular_energy_eqn4.png)
 
-**TODO**
+**TODO:** Figure out the above!
+
+Well the final result should be:
+
+![angular motion solved](./img/angular_final_solution.png)
 
 ### 3.2. Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
 
@@ -279,7 +283,7 @@ Then the angular kinetic energy can receive a similar treatment:
 
 Pitfalls:
 
-* The tensors are ORIENTED. So in order to use them, must translate and rotate them into world space first! The easiest way I found to do this was to setup something that just handles storing the orientation info.
+* The tensors are ORIENTED. So in order to use them, must translate and rotate them into world space first! The easiest way I found to do this was to setup something that only handles storing the orientation info.
 * Can only use the "parallel axis" equations ONCE when shifting away. To use them, the original tensor MUST be centered about the center-of-mass.
 * There's a weird feed-back between storing the object's position as the center of mass and recalculating the center of mass?
 
