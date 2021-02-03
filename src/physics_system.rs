@@ -13,7 +13,7 @@ use crate::null_collider::{InternalNullCollider};
 use crate::sphere_collider::{InternalSphereCollider};
 use crate::plane_collider::{InternalPlaneCollider};
 use crate::collider_wrapper::ColliderWrapper;
-use crate::collision::collide;
+use crate::collision::{collide, Collision};
 
 /// The entire physics system.
 pub struct PhysicsSystem {
@@ -303,7 +303,7 @@ impl PhysicsSystem {
 								&second_start_orientation,
 								&second_end_orientation,
 							);
-							//println!("Collision check between {:?} and {:?} -> {:?}", first_collider_handle, second_collider_handle, collision_option);
+
 							if let Some(collision) = collision_option {
 								let time = collision.times.min();
 								// If the objects are (already) moving away from the point of contact, then ignore the collision.
@@ -357,31 +357,18 @@ impl PhysicsSystem {
 				let first  = first_option.unwrap();
 				let second = second_option.unwrap();
 
-				let first_offset  = collision.position - first.orientation.position;
-				let second_offset = collision.position - second.orientation.position;
-
-				let first_full_velocity  = first.get_velocity_at_world_position( &collision.position);
-				let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
-				let velocity_delta = first_full_velocity - second_full_velocity;
-
-				//self.debug.push(format!("Handling collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?})", collision.position, first_entity_handle, first_full_velocity, second_entity_handle, second_full_velocity));
-
-				let numerator = -(1.0 + earliest_collision_restitution) * velocity_delta.dot(&collision.normal);
-				let first_linear_weight   = 1.0 / first.get_total_mass();
-				let second_linear_weight  = 1.0 / second.get_total_mass();
-				let first_angular_amount = first.get_inverse_moment_of_inertia()   * first_offset.cross( &collision.normal);
-				let first_angular_weight  = first_angular_amount.cross(&first_offset).dot( &collision.normal);
-				let second_angular_amount = second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal);
-				let second_angular_weight = second_angular_amount.cross(&second_offset).dot(&collision.normal);
-				let denominator = first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight;
-				let impulse_magnitude = numerator / denominator;
-				//println!("{} impulse_magnitude: {:?} / {:?}", iteration, numerator, denominator);
+				let impulse = PhysicsSystem::calc_collision_impulse(
+					&first,
+					&second,
+					earliest_collision_restitution,
+					&collision,
+				);
 
 				{
 					// Apply the impluse and re-integrate the movement.
 					let info = &mut entity_info[earliest_collision_first_info_index];
 
-					first.apply_impulse(&collision.position, &collision.normal.scale(impulse_magnitude));
+					first.apply_impulse(&collision.position, &impulse);
 
 					info.linear_movement = first.velocity * time_after_collision;
 					info.angular_movement = first.angular_velocity * time_after_collision;
@@ -390,7 +377,7 @@ impl PhysicsSystem {
 					// Apply the impulse and re-integrate the movement.
 					let info = &mut entity_info[earliest_collision_second_info_index];
 
-					second.apply_impulse(&collision.position, &collision.normal.scale(-impulse_magnitude));
+					second.apply_impulse(&collision.position, &-impulse);
 
 					info.linear_movement = second.velocity * time_after_collision;
 					info.angular_movement = second.angular_velocity * time_after_collision;
@@ -399,6 +386,27 @@ impl PhysicsSystem {
 				break; // No collision means done handling the entire step. So quit out of this loop.
 			}
 		}
+	}
+
+	/// Calculates the collision impulse between two entities.
+	pub fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, collision : &Collision) -> Vec3 {
+		let first_offset  = collision.position - first.orientation.position;
+		let second_offset = collision.position - second.orientation.position;
+
+		let first_full_velocity  = first.get_velocity_at_world_position( &collision.position);
+		let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
+		let velocity_delta = first_full_velocity - second_full_velocity;
+
+		let numerator = -(1.0 + restitution_coefficient) * velocity_delta.dot(&collision.normal);
+		let first_linear_weight   = 1.0 / first.get_total_mass();
+		let second_linear_weight  = 1.0 / second.get_total_mass();
+		let first_angular_amount = first.get_inverse_moment_of_inertia()   * first_offset.cross( &collision.normal);
+		let first_angular_weight  = first_angular_amount.cross(&first_offset).dot( &collision.normal);
+		let second_angular_amount = second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal);
+		let second_angular_weight = second_angular_amount.cross(&second_offset).dot(&collision.normal);
+		let denominator = first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight;
+
+		collision.normal.scale(numerator / denominator)
 	}
 }
 

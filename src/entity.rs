@@ -175,7 +175,7 @@ impl InternalEntity {
 		linear_energy + angular_energy
 	}
 
-	// Applies an impulse to this instance's linear and angular velocities.
+	// Applies an impulse at a (world) position to this instance's linear and angular velocities.
 	pub fn apply_impulse(&mut self, position : &Vec3, impulse : &Vec3) {
 		self.velocity += impulse.scale(1.0 / self.get_total_mass());
 		self.angular_velocity += self.get_inverse_moment_of_inertia() * (position - self.orientation.position).cross(&impulse);
