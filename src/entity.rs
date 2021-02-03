@@ -174,6 +174,12 @@ impl InternalEntity {
 		let angular_energy = (self.get_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
 		linear_energy + angular_energy
 	}
+
+	// Applies an impulse to this instance's linear and angular velocities.
+	pub fn apply_impulse(&mut self, position : &Vec3, impulse : &Vec3) {
+		self.velocity += impulse.scale(1.0 / self.get_total_mass());
+		self.angular_velocity += self.get_inverse_moment_of_inertia() * (position - self.orientation.position).cross(&impulse);
+	}
 }
 
 /// A copy of all of the publicly-accessible properties of a physical object in the world.

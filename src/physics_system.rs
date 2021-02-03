@@ -357,8 +357,6 @@ impl PhysicsSystem {
 				let first  = first_option.unwrap();
 				let second = second_option.unwrap();
 
-				let first_inverse_moment_of_inertia  = first.get_inverse_moment_of_inertia();
-				let second_inverse_moment_of_inertia = second.get_inverse_moment_of_inertia();
 				let first_offset  = collision.position - first.orientation.position;
 				let second_offset = collision.position - second.orientation.position;
 
@@ -371,9 +369,9 @@ impl PhysicsSystem {
 				let numerator = -(1.0 + earliest_collision_restitution) * velocity_delta.dot(&collision.normal);
 				let first_linear_weight   = 1.0 / first.get_total_mass();
 				let second_linear_weight  = 1.0 / second.get_total_mass();
-				let first_angular_amount = first_inverse_moment_of_inertia  * first_offset.cross( &collision.normal);
+				let first_angular_amount = first.get_inverse_moment_of_inertia()   * first_offset.cross( &collision.normal);
 				let first_angular_weight  = first_angular_amount.cross(&first_offset).dot( &collision.normal);
-				let second_angular_amount = second_inverse_moment_of_inertia * second_offset.cross(&collision.normal);
+				let second_angular_amount = second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal);
 				let second_angular_weight = second_angular_amount.cross(&second_offset).dot(&collision.normal);
 				let denominator = first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight;
 				let impulse_magnitude = numerator / denominator;
@@ -383,27 +381,25 @@ impl PhysicsSystem {
 					// Apply the impluse and re-integrate the movement.
 					let info = &mut entity_info[earliest_collision_first_info_index];
 
-					first.velocity += collision.normal.scale(impulse_magnitude * first_linear_weight);
-					info.linear_movement = first.velocity * time_after_collision;
+					first.apply_impulse(&collision.position, &collision.normal.scale(impulse_magnitude));
 
-					first.angular_velocity += first_angular_amount.scale(impulse_magnitude);
+					info.linear_movement = first.velocity * time_after_collision;
 					info.angular_movement = first.angular_velocity * time_after_collision;
 				}
 				{
 					// Apply the impulse and re-integrate the movement.
 					let info = &mut entity_info[earliest_collision_second_info_index];
 
-					second.velocity -= collision.normal.scale(impulse_magnitude * second_linear_weight);
-					info.linear_movement = second.velocity * time_after_collision;
+					second.apply_impulse(&collision.position, &collision.normal.scale(-impulse_magnitude));
 
-					second.angular_velocity -= second_angular_amount.scale(impulse_magnitude);
+					info.linear_movement = second.velocity * time_after_collision;
 					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
 			} else {
 				break; // No collision means done handling the entire step. So quit out of this loop.
 			}
 		}
-	} 
+	}
 }
 
 #[cfg(test)]
