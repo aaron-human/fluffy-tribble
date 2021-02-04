@@ -48,7 +48,7 @@ impl dyn InternalCollider {
 
 impl_downcast!(InternalCollider);
 
-/// The public representation of an arbitrary collider.
+/// The generic public representation of an arbitrary collider.
 pub trait Collider : Downcast + Debug {
 	/// The specific type.
 	fn get_type(&self) -> ColliderType;

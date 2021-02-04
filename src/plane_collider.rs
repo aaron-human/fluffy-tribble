@@ -92,7 +92,9 @@ impl InternalCollider for InternalPlaneCollider {
 
 /// A copy of all of the publicly-accessible properties of an infinite plane collider.
 ///
-/// This collider basically bisects space. Everything on one side is considered "in" the collision geometry, and will be collided out.
+/// This collider basically bisects space. Everything on one side is considered "in" the collision geometry.
+///
+/// This means that even if an object starts embedded in the collision geometry, it should always collide "against" the plane at a point that's furthest into the plane. So generally things shouldn't ever be able to "glitch past" one of these planes.
 #[derive(Debug)]
 pub struct PlaneCollider {
 	/// The entity, if there is one. This is NOT copied back into InternalSphereCollider, hence why it's not "pub".

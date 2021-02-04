@@ -258,7 +258,7 @@ impl Entity {
 
 	/// Gets all collider handles.
 	///
-	/// Notibly this is just the getter, as this object cannot be used to modify what colliders are attached to this entity (must use `link_collider()` for that).
+	/// Notibly this is just the getter, as this object cannot be used to modify what colliders are attached to this entity (must use [crate::PhysicsSystem::link_collider] for that).
 	pub fn get_colliders(&self) -> HashSet<ColliderHandle> {
 		self.colliders.clone()
 	}

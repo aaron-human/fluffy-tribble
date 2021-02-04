@@ -14,28 +14,34 @@ pub struct Orientation {
 	///
 	/// This is stored in WORLD coordinates.
 	///
-	/// Generally avoid changing this directly. It's better to use affect_with() and after_affected().
+	/// Generally avoid changing this directly. It's better to use [Orientation::affect_with] and [Orientation::after_affected].
 	pub position : Vec3,
 
 	/// The current rotation that this reference frame.
 	///
 	/// This will be the rotation of the entity about it's center of mass.
 	///
-	/// Generally should preferr using the affect_with() and after_affected() functions to apply changes.
+	/// Generally should preferr using the [Orientation::affect_with] and [Orientation::after_affected] functions to apply changes.
 	pub rotation : Quat,
 
 	/// The origin of the LOCAL space.
 	///
 	/// For entities this is the vector from the center of mass to the entity's "position" in LOCAL space.
 	///
-	/// This will generally never change unless an object's mass information changes.
+	/// This will generally never change unless an object's mass distribution changes.
 	pub internal_origin_offset : Vec3,
 }
 
+/// Uses parallel axis theorem to translate the given moment of inertia tensor.
+///
+/// **WARNING:** This can only be applied to a moment of intertia tensor ONCE (as the math only works out if the passed in tensor is centered about the center of mass). In other words: once a moment of inertia tensor is passed through this it makes no sense to ever pass it through this again.
 fn translate_moment_of_inertia(moment : &Mat3, total_mass : f32, translation : &Vec3) -> Mat3 {
 	moment + total_mass * (Mat3::from_diagonal_element(translation.dot(&translation)) - translation * translation.transpose())
 }
 
+/// Rotates the given moment of inertia tensor.
+///
+/// This applies a very generic sort of generic "transform from one space into another" matrix handling. Nothing more unique is needed for moment of inertia tensors.
 fn rotate_moment_of_inertia(moment : &Mat3, rotation : &Quat) -> Mat3 {
 	let out_of = rotation.to_rotation_matrix();
 	out_of * moment * out_of.transpose()
@@ -67,6 +73,8 @@ impl Orientation {
 	}
 
 	/// Converts a local position into world space.
+	///
+	/// So this applies the orientation's rotation and translation to the position.
 	pub fn position_into_world(&self, position : &Vec3) -> Vec3 {
 		self.into_world().transform_point(&Point3::from(*position)).coords
 	}
@@ -85,16 +93,18 @@ impl Orientation {
 		self.into_world().transform_vector(direction)
 	}
 
-	/// Transform a moment of inertia tensor that's about the given 'center_of_mass' (which is specified in local space) so that it's relative to this orientation's 'position' in local space.
+	/// Transform a moment of inertia tensor that's about the given `center_of_mass` (which is specified in local space) so that it's relative to this orientation's `position` in local space.
 	///
-	/// Since this orientation's 'position' is usually its center-of-mass, this effectively gets the moment to be ready to be passed through finalize_moment_of_inertia() so it can be readily available in world-space (and be centered about the center of mass there).
+	/// This should exclusively be used used internally. There's no good reason anything outside this crate would ever need to call this.
+	///
+	/// Since this orientation's `position` is usually its center-of-mass, this effectively gets the moment to be ready to be passed through [Orientation::finalize_moment_of_inertia] so it can be readily available in world-space (and be centered about the center of mass there).
 	pub fn prep_moment_of_inertia(&self, center_of_mass : &Vec3, total_mass : f32, moment : &Mat3) -> Mat3 {
 		translate_moment_of_inertia(moment, total_mass, &(self.internal_origin_offset + center_of_mass))
 	}
 
 	/// Completes converting a moment of inertia that was sent through prep_moment_of_inertia() so that it's in world-space.
 	///
-	/// This means it uses only this orientation's rotation (matrix) on the tensor.
+	/// This means it applies this orientation's rotation (matrix) to the tensor.
 	pub fn finalize_moment_of_inertia(&self, moment : &Mat3) -> Mat3 {
 		rotate_moment_of_inertia(moment, &self.rotation)
 	}
@@ -115,7 +125,7 @@ impl Orientation {
 		self.rotation = Quat::from_scaled_axis(*angular_movement) * self.rotation;
 	}
 
-	/// Creates an instance that is like this one after a rotation and translation has been applied.
+	/// Stores the result of applying a rotation and translation to this instance in a new instance.
 	pub fn after_affected(&self, linear_movement : &Vec3, angular_movement : &Vec3) -> Orientation {
 		let mut copy = self.clone();
 		copy.affect_with(linear_movement, angular_movement);

@@ -1,7 +1,7 @@
 
 mod consts;
 mod types;
-pub use types::{EntityHandle, ColliderHandle};
+pub use types::{EntityHandle, ColliderHandle, UnaryForceGeneratorHandle};
 mod range;
 
 pub mod orientation;

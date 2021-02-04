@@ -30,7 +30,7 @@ pub struct PhysicsSystem {
 	/// For now this limits how many collisions can be handled in a step.
 	pub iteration_max : u8,
 
-	/// A debugging value to get info out.
+	/// A place to store debugging info when things go wrong internally.
 	pub debug : Vec<String>,
 }
 
