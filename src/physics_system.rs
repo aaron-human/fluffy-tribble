@@ -26,6 +26,8 @@ pub struct PhysicsSystem {
 	/// All of the unary forces to apply.
 	unary_force_generators : RefCell<Arena<Box<dyn UnaryForceGenerator>>>,
 	/// The max number of physics iterations allowed per step.
+	///
+	/// For now this limits how many collisions can be handled in a step.
 	pub iteration_max : u8,
 
 	/// A debugging value to get info out.
@@ -62,6 +64,7 @@ impl PhysicsSystem {
 	}
 
 	/// Removes an entity and all of it's associated colliders.
+	///
 	/// Returns if anything changed (i.e. if the entity existed and was removed).
 	pub fn remove_entity(&mut self, handle : EntityHandle) -> bool {
 		let removed = self.entities.borrow_mut().remove(handle);
@@ -75,12 +78,14 @@ impl PhysicsSystem {
 	}
 
 	/// Gets an entity's public interface.
+	///
 	/// These values are all copies of the internal entity.
 	pub fn get_entity(&self, handle : EntityHandle) -> Option<Entity> {
 		self.entities.borrow().get(handle).and_then(|internal| Some(internal.make_pub()))
 	}
 
 	/// Updates an entity with the given values.
+	///
 	/// This does NOT update the list of linked/attached colliders. Must use link_collider() for that.
 	pub fn update_entity(&mut self, handle : EntityHandle, source : Entity) -> Result<(),()> {
 		self.entities.borrow_mut().get_mut(handle).ok_or(()).and_then(|internal| {
@@ -91,7 +96,7 @@ impl PhysicsSystem {
 		})
 	}
 
-	/// Adds a collider to a given entity.
+	/// Adds a collider to the system.
 	pub fn add_collider(&mut self, source : ColliderWrapper) -> Result<ColliderHandle, ()> {
 		match source {
 			ColliderWrapper::Null(source) => {
@@ -134,6 +139,7 @@ impl PhysicsSystem {
 	}
 
 	/// Gets the collider's public interface.
+	///
 	/// These values are all copies of the internal collider.
 	pub fn get_collider(&self, handle : ColliderHandle) -> Option<ColliderWrapper> {
 		if let Some(collider) = self.colliders.borrow().get(handle) {
@@ -152,7 +158,9 @@ impl PhysicsSystem {
 	}
 
 	/// Gets the collider's public interface.
+	///
 	/// These values are all copies of the internal collider.
+	///
 	/// This does NOT update the list of linked/attached colliders. Must use link_collider() for that.
 	pub fn update_collider(&mut self, handle : ColliderHandle, source : ColliderWrapper) -> Result<(), ()> {
 		let mut colliders = self.colliders.borrow_mut();
@@ -196,6 +204,7 @@ impl PhysicsSystem {
 	}
 
 	/// Links the collider to the entity.
+	///
 	/// Will unlink it from any existing entity.
 	pub fn link_collider(&mut self, collider_handle : ColliderHandle, entity_handle : Option<EntityHandle>) -> Result<(), ()> {
 		// Start by verifying the collider exists. Nothing can happen without it.
@@ -247,6 +256,10 @@ impl PhysicsSystem {
 	}
 
 	/// Moves the system forward by the given time step.
+	///
+	/// Note that a large `dt` will most likely lead to instability.
+	///
+	/// Also this isn't guaranteed to move everything forward by `dt`. It might move things forward less if it hits a computational limit.
 	pub fn step(&mut self, dt : f32) {
 		self.debug.clear();
 		// Go through all entities and perform the initial integration.
