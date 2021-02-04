@@ -439,7 +439,7 @@ impl PhysicsSystem {
 	}
 
 	/// Calculates the collision impulse between two entities.
-	pub fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, collision : &Collision) -> Vec3 {
+	fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, collision : &Collision) -> Vec3 {
 		let first_offset  = collision.position - first.orientation.position;
 		let second_offset = collision.position - second.orientation.position;
 
