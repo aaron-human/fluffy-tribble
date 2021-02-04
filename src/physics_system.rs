@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 use generational_arena::Arena;
 
 use crate::consts::EPSILON;
-use crate::types::{Vec3, EntityHandle, ColliderHandle};
+use crate::types::{Vec3, EntityHandle, ColliderHandle, UnaryForceGeneratorHandle};
 use crate::entity::{InternalEntity, Entity};
 use crate::collider::{ColliderType, InternalCollider};
 #[allow(unused_imports)] // Need this trait, but Rust's warning system doesn't seem to understand that.
@@ -15,12 +15,17 @@ use crate::plane_collider::{InternalPlaneCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::{collide, Collision};
 
+use crate::force::Force;
+use crate::unary_force_generator::UnaryForceGenerator;
+
 /// The entire physics system.
 pub struct PhysicsSystem {
 	/// All the whole physical objects.
 	entities : RefCell<Arena<InternalEntity>>,
 	/// All of the colliders on the physical objects.
 	colliders : RefCell<Arena<Box<dyn InternalCollider>>>,
+	/// All of the unary forces to apply.
+	unary_force_generators : RefCell<Arena<Box<dyn UnaryForceGenerator>>>,
 	/// The max number of physics iterations allowed per step.
 	pub iteration_max : u8,
 
@@ -44,6 +49,7 @@ impl PhysicsSystem {
 		PhysicsSystem {
 			entities: RefCell::new(Arena::new()),
 			colliders : RefCell::new(Arena::new()),
+			unary_force_generators : RefCell::new(Arena::new()),
 			iteration_max : 5,
 
 			debug: Vec::new(),
@@ -229,6 +235,16 @@ impl PhysicsSystem {
 		}
 
 		Ok(())
+	}
+
+	/// Adds a UnaryForceGenerator to the system.
+	pub fn add_unary_force_generator(&mut self, generator : Box<dyn UnaryForceGenerator>) -> Result<UnaryForceGeneratorHandle, ()> {
+		Ok(self.unary_force_generators.borrow_mut().insert(generator))
+	}
+
+	/// Removes and returns a UnaryForceGenerator from the system.
+	pub fn remove_unary_force_generator(&mut self, handle : UnaryForceGeneratorHandle) -> Option<Box<dyn UnaryForceGenerator>> {
+		self.unary_force_generators.borrow_mut().remove(handle)
 	}
 
 	/// Moves the system forward by the given time step.
@@ -417,6 +433,7 @@ mod tests {
 	use crate::null_collider::NullCollider;
 	use crate::sphere_collider::SphereCollider;
 	use crate::plane_collider::PlaneCollider;
+	use crate::gravity_generator::GravityGenerator;
 
 	/// Verify can create/store/remove entities.
 	#[test]
@@ -1043,6 +1060,16 @@ mod tests {
 				assert!((new_wall_position - wall_position).magnitude() < EPSILON);
 			}
 		}
+	}
+
+	/// Check that can add and remove a simple UnaryForceGenerator (GravityGenerator in this case).
+	#[test]
+	fn add_remove_unary_force_generator() {
+		let mut system = PhysicsSystem::new();
+		let handle = system.add_unary_force_generator(Box::new(GravityGenerator::new(Vec3::new(1.0, 2.0, 3.0)))).unwrap();
+		let returned = system.remove_unary_force_generator(handle).unwrap();
+		assert!((returned.downcast::<GravityGenerator>().unwrap().acceleration - Vec3::new(1.0, 2.0, 3.0)).magnitude() < EPSILON);
+		assert!(system.remove_unary_force_generator(handle).is_none());
 	}
 
 	// TODO? Only angular inertia into a collision.

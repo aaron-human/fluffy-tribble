@@ -9,3 +9,4 @@ use generational_arena::Index;
 
 pub type EntityHandle = Index;
 pub type ColliderHandle = Index;
+pub type UnaryForceGeneratorHandle = Index;
