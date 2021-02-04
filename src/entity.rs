@@ -237,7 +237,7 @@ pub struct Entity {
 
 impl Entity {
 	/// Creates a new store for entity information with everything set to its defaults.
-	/// Can use this to store info for an [crate::physics_system::add_entity] call later.
+	/// Can use this to store info for an [crate::physics_system::PhysicsSystem::add_entity] call later.
 	pub fn new() -> Entity {
 		Entity {
 			position: Vec3::zeros(),
