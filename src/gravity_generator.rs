@@ -18,7 +18,7 @@ impl GravityGenerator {
 }
 
 impl UnaryForceGenerator for GravityGenerator {
-	fn make_force(&mut self, _dt : f32, physics : &mut PhysicsSystem, handle : EntityHandle) -> Force {
+	fn make_force(&mut self, _dt : f32, physics : &PhysicsSystem, handle : EntityHandle) -> Force {
 		let entity = physics.get_entity(handle).unwrap();
 		Force::new(
 			self.acceleration.scale(entity.get_last_total_mass()),

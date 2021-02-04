@@ -283,7 +283,10 @@ impl Entity {
 	}
 
 	/// Gets the moment of inertia in WORLD space.
-	fn get_last_moment_of_inertia(&self) -> Mat3 {
+	/// This uses the last known good moment of inertia, but inverted and passed through the **current** orientation of this Entity instance.
+	///
+	/// So this responds to changes in `self.position` and `self.rotation` but NOT changes to the mass distribution.
+	pub fn get_last_moment_of_inertia(&self) -> Mat3 {
 		self.make_orientation().finalize_moment_of_inertia(&self.last_prepped_moment_of_inertia)
 	}
 

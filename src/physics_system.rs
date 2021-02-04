@@ -15,7 +15,6 @@ use crate::plane_collider::{InternalPlaneCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::{collide, Collision};
 
-use crate::force::Force;
 use crate::unary_force_generator::UnaryForceGenerator;
 
 /// The entire physics system.
@@ -251,17 +250,41 @@ impl PhysicsSystem {
 	pub fn step(&mut self, dt : f32) {
 		self.debug.clear();
 		// Go through all entities and perform the initial integration.
+		let mut entity_handles = Vec::with_capacity(self.entities.borrow().len());
+		for (handle, _) in self.entities.borrow().iter() {
+			entity_handles.push(handle);
+		}
+		let mut unary_force_generator_handles = Vec::with_capacity(self.unary_force_generators.borrow().len());
+		for (handle, _) in self.unary_force_generators.borrow().iter() {
+			unary_force_generator_handles.push(handle);
+		}
 		let mut entity_info = Vec::with_capacity(self.entities.borrow().len());
-		for (handle, entity) in self.entities.borrow_mut().iter_mut() { // TODO: Optimize this.
-			let acceleration = Vec3::zeros(); // TODO: Calculate acceleration.
+		for handle in entity_handles { // TODO: Optimize this.
+			let mut acceleration = Vec3::zeros();
+			let mut torque = Vec3::zeros();
+
+			{
+				let entity_copy = self.get_entity(handle).unwrap();
+				// Since 0.0 * INFINITY becomes NaN, best to just acceleration and torque on infinite masses.
+				if entity_copy.get_last_total_mass().is_finite() {
+					for generator_handle in &unary_force_generator_handles {
+						let mut generators_borrow = self.unary_force_generators.borrow_mut();
+						let generator_borrow = generators_borrow.get_mut(*generator_handle).unwrap();
+						let force = generator_borrow.make_force(dt, &self, handle);
+
+						acceleration += force.force.scale(1.0 / entity_copy.get_last_total_mass());
+						torque += entity_copy.get_last_moment_of_inertia() * (force.position - entity_copy.position).cross(&force.force);
+					}
+				}
+			}
+
+			let mut entities_borrow = self.entities.borrow_mut();
+			let entity = entities_borrow.get_mut(handle).unwrap();
 			entity.velocity += acceleration.scale(dt);
 			let linear_movement = entity.velocity.scale(dt);
 
-			let torque = Vec3::zeros(); // TODO: Calculate torque. Also fix how angular velocity is decided.
-			let angular_movement = {
-				entity.angular_velocity += entity.get_inverse_moment_of_inertia() * torque.scale(dt); // TODO
-				entity.angular_velocity.scale(dt)
-			};
+			entity.angular_velocity += entity.get_inverse_moment_of_inertia() * torque.scale(dt);
+			let angular_movement = entity.angular_velocity.scale(dt);
 
 			entity_info.push(EntityStepInfo { handle, linear_movement, angular_movement, });
 		}
@@ -273,7 +296,6 @@ impl PhysicsSystem {
 		for _iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
 			// Will be "done" once no collisions left or run out of iterations.
-
 
 			// So start by going through every unique pair of handles and finding the first collision.
 			let mut earliest_collision_percent = 1.0; // Collisions must happen before 100% of time_left.
@@ -328,7 +350,6 @@ impl PhysicsSystem {
 								let velocity_delta = first_full_velocity - second_full_velocity;
 
 								if EPSILON > velocity_delta.dot(&collision.normal) {
-									//println!("Dropping collision!");
 									//self.debug.push(format!("Dropping collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?})", collision.position, first_collider_handle, first_full_velocity, second_collider_handle, second_full_velocity));
 									continue;
 								}
@@ -1039,7 +1060,6 @@ mod tests {
 				//
 				let mut entity = Entity::new();
 				entity.position = wall_position;
-				entity.position = wall_position;
 				system.update_entity(wall, entity).unwrap();
 			}
 			let initial_energy = system.get_entity(dual).unwrap().get_total_energy();
@@ -1070,6 +1090,46 @@ mod tests {
 		let returned = system.remove_unary_force_generator(handle).unwrap();
 		assert!((returned.downcast::<GravityGenerator>().unwrap().acceleration - Vec3::new(1.0, 2.0, 3.0)).magnitude() < EPSILON);
 		assert!(system.remove_unary_force_generator(handle).is_none());
+	}
+
+	/// Check that gravity will drag a (perfectly inelastic) ball straight to the ground.
+	#[test]
+	fn basic_gravity() {
+		const RADIUS : f32 = 1.0;
+		let mut system = PhysicsSystem::new();
+		let handle = {
+			let mut entity = Entity::new();
+			entity.position = Vec3::new(0.0, 3.0, 0.0);
+			let entity_handle = system.add_entity(entity).unwrap();
+			//
+			let mut sphere = SphereCollider::new(RADIUS);
+			sphere.mass = 1.0;
+			sphere.restitution_coefficient = 0.0;
+			let sphere_handle = system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap();
+			system.link_collider(sphere_handle, Some(entity_handle)).unwrap();
+
+			entity_handle
+		};
+		{
+			let entity_handle = system.add_entity(Entity::new()).unwrap();
+			let mut plane = PlaneCollider::new();
+			plane.normal = Vec3::y();
+			plane.mass = INFINITY;
+			let plane_handle = system.add_collider(ColliderWrapper::Plane(plane)).unwrap();
+			system.link_collider(plane_handle, Some(entity_handle)).unwrap();
+		}
+
+		system.add_unary_force_generator(Box::new(GravityGenerator::new(Vec3::new(0.0, -1.0, 0.0)))).unwrap();
+
+		for _ in 0..5 {
+			system.step(5.0);
+		}
+
+		{
+			let position = system.get_entity(handle).unwrap().position;
+			println!("Final position: {:?}", position);
+			assert!((position - Vec3::new(0.0, 1.0, 0.0)).magnitude() < EPSILON);
+		}
 	}
 
 	// TODO? Only angular inertia into a collision.
