@@ -98,24 +98,34 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 	None
 }
 
-/// Collide a sphere with an inifinite plane.
-pub fn collide_sphere_with_plane(radius1 : f32, center1 : &Vec3, movement1 : &Vec3, position2 : &Vec3, normal2 : &Vec3, movement2 : &Vec3) -> Option<Collision> {
+/// A helper to get the time of collision for a sphere overlapping a plane.
+fn sphere_plane_overlap_time(radius1 : f32, center1 : &Vec3, movement1 : &Vec3, position2 : &Vec3, normal2 : &Vec3, movement2 : &Vec3, infinite_backdrop : bool) -> Range {
 	let start_nearest  = center1 + normal2.scale(-radius1);
 	let start_farthest = center1 + normal2.scale( radius1);
 	let circle_range = Range::range(
 		start_nearest.dot(normal2),
 		start_farthest.dot(normal2),
 	);
+	let plane_value = position2.dot(normal2);
 	let plane_range = Range::range(
-		position2.dot(normal2),
-		-INFINITY,
+		plane_value,
+		if infinite_backdrop { -INFINITY } else { plane_value },
 	);
-	let mut times = circle_range.linear_overlap(
+	circle_range.linear_overlap(
 		&plane_range,
 		movement2.dot(normal2) - movement1.dot(normal2),
-	);
-	times = times.intersect(&Range::range(0.0, 1.0));
+	)
+}
+
+/// Collide a sphere with an inifinite plane.
+pub fn collide_sphere_with_plane(radius1 : f32, center1 : &Vec3, movement1 : &Vec3, position2 : &Vec3, normal2 : &Vec3, movement2 : &Vec3) -> Option<Collision> {
+	let times = sphere_plane_overlap_time(
+		radius1, center1, movement1,
+		position2, normal2, movement2,
+		true,
+	).intersect(&Range::range(0.0, 1.0));
 	if !times.is_empty() {
+		let start_nearest  = center1 + normal2.scale(-radius1); // TODO: Pass this along somehow?
 		Some(Collision {
 			times,
 			position: start_nearest + movement1.scale(times.min()),
@@ -185,6 +195,53 @@ pub fn collide_sphere_with_mid_line_segment(radius1 : f32, center1: &Vec3, movem
 		if (((hit_start - hit.position).magnitude() + (hit_end - hit.position).magnitude()) - length.magnitude()).abs() < EPSILON {
 			Some(hit)
 		} else { None }
+	} else { None }
+}
+
+/// Collide a sphere with a flat polygon bounded by convex line segments.
+///
+/// The passed in corners must be in order so that they progress in a convex manor around the edge of the polygon. They should all be coplanar.
+///
+/// **WARNING:** This isn't full collision handling between a sphere and the surface. It lacks the edge and corner collision handling. This is intentional as this is just a building-block to generate that sort of full-scale collision handling.
+pub fn collide_sphere_with_polygon_surface(radius1: f32, center1: &Vec3, movement1: &Vec3, corners2 : &Vec<Vec3>, movement2 : &Vec3) -> Option<Collision> {
+	assert!(3 <= corners2.len());
+	let normal = (corners2[1] - corners2[0]).cross(&(corners2[2] - corners2[0])).normalize();
+	let plane_start_position = corners2[0].clone();
+	let times = sphere_plane_overlap_time(
+		radius1, center1, movement1,
+		&plane_start_position, &normal, movement2,
+		false,
+	).intersect(&Range::range(0.0, 1.0));
+	if !times.is_empty() {
+		let sphere_hit_position = center1 + movement1.scale(times.min());
+		let plane_hit_position = plane_start_position + movement2.scale(times.min());
+		let hit_position = sphere_hit_position - normal.scale((sphere_hit_position - plane_hit_position).dot(&normal));
+		let normal = (hit_position - sphere_hit_position).normalize();
+		// Then verify the hit_position is in the polygon.
+		let mut expected_sign : f32 = 0.0;
+		for index in 0..corners2.len() {
+			let first = &corners2[index];
+			let second = &corners2[if index+1 < corners2.len() { index + 1 } else { 0 }];
+			let sign = (hit_position - first).cross(&(second - first)).dot(&normal);
+			// A zero 'sign' means that hit_position is basically on the line from first to second, which counts.
+			// So move on immediately.
+			if sign.abs() < EPSILON {
+				continue;
+			}
+			// At this point defintiely have a sign, so compare it.
+			if 0.0 == expected_sign {
+				expected_sign = sign.signum();
+			} else if expected_sign != sign.signum() {
+				// This means that the point is on the wrong side of at least one of the polygon edges, so it's not intersecting. Short circuit out immediately.
+				return None
+			}
+		}
+		// If made it past all that, then the collision is valid.
+		Some(Collision {
+			times,
+			position: hit_position,
+			normal,
+		})
 	} else { None }
 }
 
@@ -281,6 +338,42 @@ mod tests {
 
 				&Vec3::new(1.0, 1.0, 0.0),
 				&Vec3::new(-1.0, 1.0, 0.0),
+				&Vec3::new(-1.0, -1.0, 0.0),
+			);
+			assert!(hit.is_none());
+		}
+	}
+
+	#[test]
+	fn check_collide_sphere_with_polygon_surface() {
+		{ // The hit case
+			let hit = collide_sphere_with_polygon_surface(
+				1.0,
+				&Vec3::new(0.0, 0.0, 3.0),
+				&Vec3::new(0.0, 0.0, -2.0),
+
+				&vec![
+					Vec3::new(0.0, 1.0, 1.0),
+					Vec3::new(-1.0, -1.0, 1.0),
+					Vec3::new( 1.0, -1.0, 1.0),
+				],
+				&Vec3::new(-1.0, 0.0, 0.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 0.0, -1.0)).magnitude() < EPSILON);
+		}
+		{ // The no hit case. Make this just slightly off one of the edges.
+			let hit = collide_sphere_with_polygon_surface(
+				1.0,
+				&Vec3::new(1.0, 0.0, 3.0),
+				&Vec3::new(0.0, 0.0, -2.0),
+
+				&vec![
+					Vec3::new(0.0, 1.0, 1.0),
+					Vec3::new(-1.0, -1.0, 1.0),
+					Vec3::new( 1.0, -1.0, 1.0),
+				],
 				&Vec3::new(-1.0, -1.0, 0.0),
 			);
 			assert!(hit.is_none());
