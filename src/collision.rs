@@ -1,5 +1,6 @@
 use std::f32::INFINITY;
 
+use crate::consts::EPSILON;
 use crate::types::{Vec3};
 use crate::range::Range;
 use crate::collider::{ColliderType, InternalCollider};
@@ -147,6 +148,46 @@ pub fn collide_sphere_with_sphere(radius1 : f32, center1 : &Vec3, movement1 : &V
 	} else { None }
 }
 
+/// Detect when and where a sphere intersects the an infinite line.
+pub fn collide_sphere_with_line(radius1 : f32, center1: &Vec3, movement1 : &Vec3, start2 : &Vec3, direction2 : &Vec3, movement2 : &Vec3) -> Option<Collision> {
+	let direction = direction2.normalize();
+	let movement = movement1 - movement2;
+	let a = (center1 - start2).cross(&direction);
+	let b = movement.cross(&direction);
+	let times = Range::quadratic_zeros(
+		b.dot(&b),
+		2.0 * a.dot(&b),
+		a.dot(&a) - radius1 * radius1,
+	).intersect(&Range::range(0.0, 1.0));
+	if !times.is_empty() {
+		let line_position = start2 + movement2.scale(times.min());
+		let center_position = center1 + movement1.scale(times.min());
+		let along_length = (center_position - line_position).dot(&direction);
+		let position = line_position + direction.scale(along_length);
+		let normal = (position - center1).normalize();
+		Some(Collision {
+			times,
+			position,
+			normal,
+		})
+	} else { None }
+}
+
+/// Detect when and where a sphere intersects the middle of a line segment.
+///
+/// This isn't full line-segment vs sphere collision, as it lacks the collision checking for the end points. This is intentional, as this will only be used as a part of plane collision handling.
+pub fn collide_sphere_with_mid_line_segment(radius1 : f32, center1: &Vec3, movement1 : &Vec3, start2 : &Vec3, end2 : &Vec3, movement2 : &Vec3) -> Option<Collision> {
+	let length = end2 - start2;
+	if let Some(hit) = collide_sphere_with_line(radius1, center1, movement1, start2, &length, movement2) {
+		let hit_movement = movement2.scale(hit.times.min());
+		let hit_start = start2 + hit_movement;
+		let hit_end = end2 + hit_movement;
+		if (((hit_start - hit.position).magnitude() + (hit_end - hit.position).magnitude()) - length.magnitude()).abs() < EPSILON {
+			Some(hit)
+		} else { None }
+	} else { None }
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::consts::EPSILON;
@@ -181,9 +222,68 @@ mod tests {
 				&Vec3::new(1.0, 0.0, 1.0),
 			).unwrap();
 			assert!((hit.times.min() - 0.5).abs() < EPSILON);
-			println!("hit: {:?}", hit);
 			assert!((hit.position - Vec3::new(1.0, -1.0, 1.0)).magnitude() < EPSILON);
 			assert!((hit.normal - Vec3::new(0.0, -1.0, 0.0)).magnitude() < EPSILON);
+		}
+	}
+
+	#[test]
+	fn check_collide_sphere_with_line() {
+		{ // The hit case
+			let hit = collide_sphere_with_line(
+				1.0,
+				&Vec3::new(4.0, 3.0, 0.0),
+				&Vec3::new(0.0, -2.0, 0.0),
+
+				&Vec3::new(1.0, 1.0, 0.0),
+				&Vec3::new(3.0, 0.0, 0.0),
+				&Vec3::new(-1.0, 0.0, 0.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(4.0, 1.0, 0.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, -1.0, 0.0)).magnitude() < EPSILON);
+		}
+		{ // The no hit case
+			let hit = collide_sphere_with_line(
+				1.0,
+				&Vec3::new(4.0, 3.0, 0.0),
+				&Vec3::new(0.0, 0.0, 1.0),
+
+				&Vec3::new(1.0, 1.0, 0.0),
+				&Vec3::new(3.0, 0.0, 0.0),
+				&Vec3::new(-1.0, -1.0, 0.0),
+			);
+			assert!(hit.is_none());
+		}
+	}
+
+	#[test]
+	fn check_collide_sphere_with_mid_line_segment() {
+		{ // The hit case
+			let hit = collide_sphere_with_mid_line_segment(
+				1.0,
+				&Vec3::new(4.0, 3.0, 0.0),
+				&Vec3::new(0.0, -2.0, 0.0),
+
+				&Vec3::new(1.0, 1.0, 0.0),
+				&Vec3::new(6.0, 1.0, 0.0),
+				&Vec3::new(-1.0, 0.0, 0.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(4.0, 1.0, 0.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, -1.0, 0.0)).magnitude() < EPSILON);
+		}
+		{ // The no hit case
+			let hit = collide_sphere_with_mid_line_segment(
+				1.0,
+				&Vec3::new(4.0, 3.0, 0.0),
+				&Vec3::new(0.0, 0.0, 1.0),
+
+				&Vec3::new(1.0, 1.0, 0.0),
+				&Vec3::new(-1.0, 1.0, 0.0),
+				&Vec3::new(-1.0, -1.0, 0.0),
+			);
+			assert!(hit.is_none());
 		}
 	}
 }
