@@ -95,6 +95,8 @@ impl InternalCollider for InternalPlaneCollider {
 /// This collider basically bisects space. Everything on one side is considered "in" the collision geometry.
 ///
 /// This means that even if an object starts embedded in the collision geometry, it should always collide "against" the plane at a point that's furthest into the plane. So generally things shouldn't ever be able to "glitch past" one of these planes.
+///
+/// **WARNING:** This collider does not currently implement collision handling for rotation. The collision handling assumes the normal is constant (over the course of any motion).
 #[derive(Debug)]
 pub struct PlaneCollider {
 	/// The entity, if there is one. This is NOT copied back into InternalSphereCollider, hence why it's not "pub".
