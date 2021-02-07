@@ -12,6 +12,7 @@ use crate::collider::Collider;
 use crate::null_collider::{InternalNullCollider};
 use crate::sphere_collider::{InternalSphereCollider};
 use crate::plane_collider::{InternalPlaneCollider};
+use crate::mesh_collider::{InternalMeshCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::{collide, Collision};
 
@@ -123,6 +124,14 @@ impl PhysicsSystem {
 					Err(a) => Err(a)
 				}
 			}
+			ColliderWrapper::Mesh(source) => {
+				match InternalMeshCollider::new_from(&source) {
+					Ok(internal) => {
+						Ok(self.colliders.borrow_mut().insert(internal))
+					},
+					Err(a) => Err(a),
+				}
+			}
 		}
 	}
 
@@ -152,6 +161,9 @@ impl PhysicsSystem {
 				}
 				ColliderType::PLANE => {
 					Some(ColliderWrapper::Plane(collider.downcast_ref::<InternalPlaneCollider>().unwrap().make_pub()))
+				}
+				ColliderType::MESH => {
+					Some(ColliderWrapper::Mesh(collider.downcast_ref::<InternalMeshCollider>().unwrap().make_pub()))
 				}
 			}
 		} else { None }
@@ -188,6 +200,13 @@ impl PhysicsSystem {
 			}
 			ColliderWrapper::Plane(typed_source) => {
 				if let Some(typed_dest) = collider.downcast_mut::<InternalPlaneCollider>() {
+					typed_dest.update_from(&typed_source)
+				} else {
+					return Err(());
+				}
+			}
+			ColliderWrapper::Mesh(typed_source) => {
+				if let Some(typed_dest) = collider.downcast_mut::<InternalMeshCollider>() {
 					typed_dest.update_from(&typed_source)
 				} else {
 					return Err(());
