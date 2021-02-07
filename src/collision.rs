@@ -6,6 +6,7 @@ use crate::range::Range;
 use crate::collider::{ColliderType, InternalCollider};
 use crate::sphere_collider::{InternalSphereCollider};
 use crate::plane_collider::{InternalPlaneCollider};
+use crate::mesh_collider::{InternalMeshCollider};
 use crate::orientation::{Orientation};
 
 /// A structure for storing collision information.
@@ -93,7 +94,52 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 			return None
 		}
 	}
-	// I don't think it makes sense to detect when two planes are colliding...
+	// I don't think it makes sense to detect when two (infinite) planes are colliding...
+	if ColliderType::SPHERE == collider1.get_type() && ColliderType::MESH == collider2.get_type() {
+		let sphere = collider1.downcast_ref::<InternalSphereCollider>().unwrap();
+		let sphere_start_position = start1.position_into_world(&sphere.center);
+		let sphere_end_position = end1.position_into_world(&sphere.center);
+
+		let mesh  = collider2.downcast_ref::<InternalMeshCollider>().unwrap();
+		let mesh_start_position = start2.position_into_world(&mesh.position);
+		let mesh_end_position = end2.position_into_world(&mesh.position);
+
+		return collide_sphere_with_mesh(
+			sphere.radius,
+			&sphere_start_position,
+			&(sphere_end_position - sphere_start_position),
+			&mesh.vertices_in_world(&start2),
+			&mesh.edges,
+			&mesh.faces,
+			&(mesh_end_position - mesh_start_position),
+		);
+	}
+	if ColliderType::MESH == collider1.get_type() && ColliderType::SPHERE == collider2.get_type() {
+		let mesh  = collider1.downcast_ref::<InternalMeshCollider>().unwrap();
+		let mesh_start_position = start1.position_into_world(&mesh.position);
+		let mesh_end_position = end1.position_into_world(&mesh.position);
+
+		let sphere = collider2.downcast_ref::<InternalSphereCollider>().unwrap();
+		let sphere_start_position = start2.position_into_world(&sphere.center);
+		let sphere_end_position = end2.position_into_world(&sphere.center);
+
+		let collision_option = collide_sphere_with_mesh(
+			sphere.radius,
+			&sphere_start_position,
+			&(sphere_end_position - sphere_start_position),
+			&mesh.vertices_in_world(&start1),
+			&mesh.edges,
+			&mesh.faces,
+			&(mesh_end_position - mesh_start_position),
+		);
+		// Must negate the normal as the sphere is the second collider.
+		if let Some(mut collision) = collision_option {
+			collision.normal *= -1.0;
+			return Some(collision);
+		} else {
+			return None
+		}
+	}
 
 	None
 }
@@ -214,14 +260,15 @@ pub fn collide_sphere_with_polygon_surface(radius1: f32, center1: &Vec3, movemen
 	).intersect(&Range::range(0.0, 1.0));
 	if !times.is_empty() {
 		let sphere_hit_position = center1 + movement1.scale(times.min());
-		let plane_hit_position = plane_start_position + movement2.scale(times.min());
+		let total_plane_movement = movement2.scale(times.min());
+		let plane_hit_position = plane_start_position + total_plane_movement;
 		let hit_position = sphere_hit_position - normal.scale((sphere_hit_position - plane_hit_position).dot(&normal));
 		let normal = (hit_position - sphere_hit_position).normalize();
 		// Then verify the hit_position is in the polygon.
 		let mut expected_sign : f32 = 0.0;
 		for index in 0..corners2.len() {
-			let first = &corners2[index];
-			let second = &corners2[if index+1 < corners2.len() { index + 1 } else { 0 }];
+			let first = corners2[index] + total_plane_movement;
+			let second = corners2[if index+1 < corners2.len() { index + 1 } else { 0 }] + total_plane_movement;
 			let sign = (hit_position - first).cross(&(second - first)).dot(&normal);
 			// A zero 'sign' means that hit_position is basically on the line from first to second, which counts.
 			// So move on immediately.
@@ -243,6 +290,76 @@ pub fn collide_sphere_with_polygon_surface(radius1: f32, center1: &Vec3, movemen
 			normal,
 		})
 	} else { None }
+}
+
+/// A helper object to grab the earliest collision of a series of passed in collisions.
+struct EarliestCollisionAccumulator {
+	/// The current earliest.
+	earliest : Option<Collision>,
+	/// The time of the current earliest.
+	earliest_time : f32,
+}
+
+impl EarliestCollisionAccumulator {
+	/// Creates a new instance with no earliest set.
+	pub fn new() -> EarliestCollisionAccumulator {
+		EarliestCollisionAccumulator {
+			earliest: None,
+			earliest_time: INFINITY,
+		}
+	}
+
+	/// Considers storing the given possible collision.
+	pub fn consider(&mut self, possible : Option<Collision>) {
+		if let Some(collision) = possible {
+			if collision.times.min() < self.earliest_time {
+				println!("Got earliest!");
+				self.earliest_time = collision.times.min();
+				self.earliest = Some(collision);
+			} else {
+				println!("Got later...");
+			}
+		} else {
+			println!("Got nothing!");
+		}
+	}
+
+	/// Yields the closest found.
+	pub fn get(self) -> Option<Collision> { self.earliest }
+}
+
+/// Collides a sphere against a mesh.
+pub fn collide_sphere_with_mesh(radius1 : f32, center1: &Vec3, movement1 : &Vec3, vertices2 : &Vec<Vec3>, edges2 : &Vec<(usize, usize)>, faces2 : &Vec<Vec<usize>>, movement2 : &Vec3) -> Option<Collision> {
+	let mut accumulator = EarliestCollisionAccumulator::new();
+	// First check all the corners.
+	for vertex in vertices2 {
+		println!("vertex");
+		accumulator.consider(collide_sphere_with_sphere(
+			radius1, center1, movement1,
+			0.0, vertex, movement2,
+		));
+	}
+	// Then check all the edges.
+	for (index1, index2) in edges2 {
+		println!("edge");
+		accumulator.consider(collide_sphere_with_mid_line_segment(
+			radius1, center1, movement1,
+			&vertices2[*index1], &vertices2[*index2], movement2,
+		));
+	}
+	// Then check all the planes.
+	for face in faces2 {
+		println!("face");
+		let mut corners = Vec::with_capacity(face.len());
+		for index in face {
+			corners.push(vertices2[*index].clone()); // TODO: Make this more efficient.
+		}
+		accumulator.consider(collide_sphere_with_polygon_surface(
+			radius1, center1, movement1,
+			&corners, movement2,
+		));
+	}
+	accumulator.get()
 }
 
 #[cfg(test)]
@@ -376,6 +493,86 @@ mod tests {
 				],
 				&Vec3::new(-1.0, -1.0, 0.0),
 			);
+			assert!(hit.is_none());
+		}
+	}
+
+	#[test]
+	fn check_collide_sphere_with_mesh() {
+		let vertices = vec![
+			Vec3::new(0.0, 1.0, 1.0),
+			Vec3::new(-1.0, -1.0, 1.0),
+			Vec3::new( 1.0, -1.0, 1.0),
+		];
+		let edges = vec![
+			(0, 1),
+			(1, 2),
+			(2, 0),
+		];
+		let faces = vec![
+			vec![
+				0, 1, 2,
+			],
+		];
+		let movement = Vec3::zeros();
+		{ // The hit a corner.
+			let hit = collide_sphere_with_mesh(
+				1.0,
+				&Vec3::new(0.0, 3.0, 1.0),
+				&Vec3::new(0.0,-2.0, 0.0),
+
+				&vertices,
+				&edges,
+				&faces,
+				&movement,
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(0.0, 1.0, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, -1.0, 0.0)).magnitude() < EPSILON);
+		}
+		{ // The hit an edge.
+			let hit = collide_sphere_with_mesh(
+				1.0,
+				&Vec3::new(0.0, -3.0, 1.0),
+				&Vec3::new(0.0, 2.0, 0.0),
+
+				&vertices,
+				&edges,
+				&faces,
+				&movement,
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(0.0, -1.0, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 1.0, 0.0)).magnitude() < EPSILON);
+		}
+		{ // The hit the flat surface.
+			let hit = collide_sphere_with_mesh(
+				1.0,
+				&Vec3::new(0.5, -0.5, 3.0),
+				&Vec3::new(0.0, 0.0, -2.0),
+
+				&vertices,
+				&edges,
+				&faces,
+				&movement,
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(0.5, -0.5, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 0.0, -1.0)).magnitude() < EPSILON);
+		}
+		{ // The no hit case.
+			println!("Start!");
+			let hit = collide_sphere_with_mesh(
+				1.0,
+				&Vec3::new(0.0, 0.0, 3.0),
+				&Vec3::new(0.0, 0.0, -2.0),
+
+				&vertices,
+				&edges,
+				&faces,
+				&Vec3::new(0.0, 4.0, 0.0),
+			);
+			println!("no hit? {:?}", hit);
 			assert!(hit.is_none());
 		}
 	}

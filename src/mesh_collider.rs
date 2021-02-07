@@ -1,6 +1,7 @@
 use crate::consts::EPSILON;
 use crate::types::{Vec3, Mat3, EntityHandle};
 use crate::collider::{ColliderType, Collider, InternalCollider};
+use crate::orientation::Orientation;
 
 /// The internal representation of a mesh collider.
 #[derive(Debug)]
@@ -65,6 +66,15 @@ impl InternalMeshCollider {
 			self.restitution_coefficient = source.restitution_coefficient;
 			Ok(())
 		}
+	}
+
+	/// Returns all the verticies after being moved into world space. The passed in orientation should be from the owning Entity.
+	pub fn vertices_in_world(&self, orientation : &Orientation) -> Vec<Vec3> {
+		let mut transformed = Vec::with_capacity(self.vertices.len());
+		for vertex in &self.vertices {
+			transformed.push(orientation.position_into_world(&(self.position + vertex)));
+		}
+		transformed
 	}
 }
 
