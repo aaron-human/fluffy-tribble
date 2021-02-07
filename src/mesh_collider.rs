@@ -70,7 +70,7 @@ impl InternalMeshCollider {
 
 impl InternalCollider for InternalMeshCollider {
 	/// The specific type.
-	fn get_type(&self) -> ColliderType { ColliderType::SPHERE }
+	fn get_type(&self) -> ColliderType { ColliderType::MESH }
 
 	/// Sets the entity this is attached to, returning the previous one.
 	fn set_entity(&mut self, handle : Option<EntityHandle>) -> Option<EntityHandle> {
