@@ -11,7 +11,7 @@ pub struct InternalMeshCollider {
 	/// The position of mesh origin.
 	///
 	/// This is in the parent entity's local space.
-	pub center : Vec3,
+	pub position : Vec3,
 
 	/// The vertices.
 	pub vertices : Vec<Vec3>,
@@ -32,7 +32,7 @@ impl InternalMeshCollider {
 		} else {
 			Ok(Box::new(InternalMeshCollider {
 				entity: None,
-				center: source.center.clone(),
+				position: source.position.clone(),
 				vertices: source.vertices.clone(),
 				faces: source.faces.clone(),
 				edges: source.edges.clone(),
@@ -45,7 +45,7 @@ impl InternalMeshCollider {
 	pub fn make_pub(&self) -> MeshCollider {
 		MeshCollider {
 			entity: self.entity.clone(),
-			center: self.center.clone(),
+			position: self.position.clone(),
 			vertices: self.vertices.clone(),
 			faces: self.faces.clone(),
 			edges: self.edges.clone(),
@@ -58,7 +58,7 @@ impl InternalMeshCollider {
 		if !source.is_valid() {
 			Err(()) // TODO: An error type.
 		} else {
-			self.center = source.center;
+			self.position = source.position;
 			self.vertices = source.vertices.clone();
 			self.faces = source.faces.clone();
 			self.edges = source.edges.clone();
@@ -84,8 +84,8 @@ impl InternalCollider for InternalMeshCollider {
 
 	/// Gets the center of mass for this collider.
 	/// This is relative to this collider's owning/linked/attached entity.
-	/// This IS NOT relative to this collider's "center" property.
-	fn get_local_center_of_mass(&self) -> Vec3 { self.center }
+	/// This IS NOT relative to this collider's "position" property.
+	fn get_local_center_of_mass(&self) -> Vec3 { self.position }
 
 	fn get_mass(&self) -> f32 { 0.0 }
 
@@ -102,10 +102,10 @@ pub struct MeshCollider {
 	/// Defaults to None.
 	entity : Option<EntityHandle>,
 
-	/// The position of the center relative to the parent entity's origin (in the parent entity's local space).
+	/// The position of the collider's origin relative to the parent entity's origin (in the parent entity's local space).
 	///
 	/// Defaults to origin.
-	pub center : Vec3,
+	pub position : Vec3,
 
 	/// The points that make up the mesh.
 	///
@@ -137,7 +137,7 @@ impl MeshCollider {
 	pub fn new() -> MeshCollider {
 		MeshCollider {
 			entity: None,
-			center: Vec3::zeros(),
+			position: Vec3::zeros(),
 			vertices: Vec::new(),
 			faces: Vec::new(),
 			edges: Vec::new(),
@@ -237,7 +237,7 @@ impl Collider for MeshCollider {
 
 	fn get_entity(&self) -> Option<EntityHandle> { self.entity }
 
-	fn get_center_of_mass(&self) -> Vec3 { self.center }
+	fn get_center_of_mass(&self) -> Vec3 { self.position }
 }
 
 
