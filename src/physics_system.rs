@@ -297,7 +297,7 @@ impl PhysicsSystem {
 
 			{
 				let entity_copy = self.get_entity(handle).unwrap();
-				// Since 0.0 * INFINITY becomes NaN, best to just acceleration and torque on infinite masses.
+				// Since 0.0 * INFINITY becomes NaN, best to NOT integrate acceleration and torque on infinite masses.
 				if entity_copy.get_last_total_mass().is_finite() {
 					for generator_handle in &unary_force_generator_handles {
 						let mut generators_borrow = self.unary_force_generators.borrow_mut();
@@ -325,7 +325,8 @@ impl PhysicsSystem {
 		// That should be able to split the world into islands of boxes that collide
 
 		let mut time_left = dt;
-		for _iteration in 0..self.iteration_max {
+		let mut concluded = false;
+		for iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
 			// Will be "done" once no collisions left or run out of iterations.
 
@@ -452,8 +453,13 @@ impl PhysicsSystem {
 					info.angular_movement = second.angular_velocity * time_after_collision;
 				}
 			} else {
+				//self.debug.push(format!("Collisions handled after {} iterations.", iteration+1));
+				concluded = true;
 				break; // No collision means done handling the entire step. So quit out of this loop.
 			}
+		}
+		if !concluded {
+			self.debug.push(format!("Ran out of iterations!"));
 		}
 	}
 
