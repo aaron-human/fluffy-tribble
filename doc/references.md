@@ -2,8 +2,9 @@
 
 Here are the resources I used when learning how to get things working:
 
-* [Newcastle University's "Physics Tutorials"](https://research.ncl.ac.uk/game/mastersdegree/gametechnologies/physicstutorials/5collisionresponse/) -- Easy to read overview, though it avoids talking about a lot of the complexities you'd need to implement yourself.
+* Newcastle University's ["Physics Tutorials"](https://research.ncl.ac.uk/game/mastersdegree/gametechnologies/physicstutorials/5collisionresponse/) -- Easy to read overview, though it avoids talking about a lot of the complexities you'd need to implement yourself.
 * [Rigid Body Collision Response](https://www.scss.tcd.ie/~manzkem/CS7057/cs7057-1516-09-CollisionResponse-mm.pdf) by Michael Manzke -- Lots of good info.
+* [Moment of Inertia Tensor](http://farside.ph.utexas.edu/teaching/336k/Newtonhtml/node64.html) from _Newtonian Dynamics_ by Richard Fitzpatrick -- A random webpage I found while trying to figure out how the Moment of Intertial Tensor matrix works with the Angular Kinetic Energy equation.
 
 Also Wikipedia's articles on angular inertia/momentum/torque/etc, though those aren't terribly readable if you don't already have a good grasp of physics.
 
