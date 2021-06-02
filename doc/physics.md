@@ -287,13 +287,20 @@ Now the above equation is a bit hefty, even with single-letter variables, so it'
 Then the angular kinetic energy can receive a similar treatment:
 
 ![angular energy eqn3](./img/angular_energy_eqn3.png)
+
 ![angular energy eqn4](./img/angular_energy_eqn4.png)
+
 ![angular energy eqn5](./img/angular_energy_eqn5.png)
 
 At this point everything on the left of the equation has been canceled, so the full equation looks like the below. Similar to the linear section, since there's an `f` in every term, (and `f` cannot be zero) one `f` can be removed.
 
 ![angular energy eqn6](./img/angular_energy_eqn6.png)
+
 ![angular energy eqn7](./img/angular_energy_eqn7.png)
+
+![angular energy eqn8](./img/angular_energy_eqn8.png)
+
+![angular energy eqn9](./img/angular_energy_eqn9.png)
 
 
 **TODO:** Figure out the above!
