@@ -302,14 +302,11 @@ At this point everything on the left of the equation has been canceled, so the f
 
 ![angular energy eqn9](./img/angular_energy_eqn9.png)
 
-
-**TODO:** Figure out the above!
-
-Well the final result should be:
+From there, the same general logic regarding the `restitution_coefficient` (from the end of the _Derivation of Linear Collision Response_ section) can be applied to convert the `-2` into `-(1 + restitution_coefficient)`. This makes the final equations:
 
 ![angular motion solved](./img/angular_final_solution.png)
 
-### 3.2. Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
+### 3.3. Aside: Calculating Center of Mass and the Moment Of Inertia Tensor
 
 **TODO!**
 
