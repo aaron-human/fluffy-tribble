@@ -115,7 +115,7 @@ Now since the velocity will only change along the collision `normal`, and equati
 
 ![linear energy solving part 1](./img/linear_energy_solve_part1.png)
 
-Each squared term on the right can be expanded, and then cancel with a term on the right:
+Each squared term on the right can be expanded, and then cancel with a term on the left:
 
 ![linear energy solving part 2](./img/linear_energy_solve_part2.png)
 
@@ -127,7 +127,7 @@ Now, since the collision must change the object trajectory to prevent them from 
 
 ![linear energy solving part 4](./img/linear_energy_solve_part4.png)
 
-With that equation elastic collisions are set. But it's not yet clear how to integrate the `restitution_coefficient` into it. So let's see how it could be made to turn the velocity between the two (along the normal) zero:
+With that equation, all elastic collisions are ready to go. But it's not yet clear how to integrate the `restitution_coefficient` into it. So let's see how it could be made to turn the velocity between the two (along the normal) zero:
 
 ![linear restitution solving](./img/linear_restitution_solve.png)
 
@@ -195,6 +195,8 @@ This might seem horribly confusing (and it will become so later on), but for now
 
 (Though the *correct* moment of inertia tensor is complicated to calculate. And you have to be vary careful to *_always_* use the center of mass to represent the object. More on that later.)
 
+One other thing to know about the above moment of inertia tensor: due to how it's constructed (angular integration of `mass * distance`) it's **symmetric and contains only real values**.
+
 So, to bring all this back to the physics engine. The moment of inertia tensor works like this:
 
 ```
@@ -213,11 +215,16 @@ So now there's a way to go from a forces applied to the surface to angular accel
 To complete the analog with the _Linear Kinetic Motion_ section, angular movement it's possible to calculate the energy stored in rotation with:
 
 ```
-energy = 0.5 * moment_of_inertia_about_angular_velocity * angular_velocity_magnitude ^ 2
-energy = 0.5 * (moment_of_inertia_tensor * angular_velocity) dot angular_velocity
+energy = 0.5 * transposed_angular_velocity * inverse_moment_of_inertia_tensor * angular_velocity
 ```
 
-Here `dot` means the dot product. As with before, the total energy may or may not be conserved depending on the `restitution_coefficient`.
+As with before, the total energy may or may not be conserved depending on the `restitution_coefficient`.
+
+Note that the transpose in the above is basically interchangeable with a dot product:
+
+```
+energy = 0.5 * angular_velocity dot (inverse_moment_of_inertia_tensor * angular_velocity)
+```
 
 Before diving into the derivation of the collision response, it's worth setting up one last thing: figuring out the _total_ velocity at a point. Since an object could conceivably have it's center of mass completely immobile but be spinning, obviously the angular velocity must contribute something to the value. Luckily this is just as easy as adding the linear and angular velocity equations above together:
 
@@ -226,7 +233,18 @@ total_velocity_at_p = linear_velocity_of_center_of_mass + angular_velocity X off
 total_velocity_at_p = linear_velocity_of_center_of_mass + angular_velocity X (p - center_of_mass)
 ```
 
-### 3.1. Derivation of Angular Collision Response
+### 3.1. Useful Vector Operator Properties
+
+Before diving into further, here are a few useful (less commonly known) properties of vectors that will become useful later:
+
+```
+a dot (b X c) = c dot (a X b)
+a dot (b X c) = b dot (c X a)
+```
+
+So for the above (a "triple product"), can easily swap around the operands.
+
+### 3.2. Derivation of Angular Collision Response
 
 First things first, to keep things readable, here are how all of the above verbose names map to single-letter counterparts:
 
@@ -270,6 +288,13 @@ Then the angular kinetic energy can receive a similar treatment:
 
 ![angular energy eqn3](./img/angular_energy_eqn3.png)
 ![angular energy eqn4](./img/angular_energy_eqn4.png)
+![angular energy eqn5](./img/angular_energy_eqn5.png)
+
+At this point everything on the left of the equation has been canceled, so the full equation looks like the below. Similar to the linear section, since there's an `f` in every term, (and `f` cannot be zero) one `f` can be removed.
+
+![angular energy eqn6](./img/angular_energy_eqn6.png)
+![angular energy eqn7](./img/angular_energy_eqn7.png)
+
 
 **TODO:** Figure out the above!
 

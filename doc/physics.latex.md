@@ -166,35 +166,93 @@ mag = \frac{-(1 + restitution\_cofficient)(\overrightarrow{v_1} - \overrightarro
 
 ## angular_energy_eqn1
 ```latex
-\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1}{2} + \frac{(I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2}{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{(I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1'}{2} + \frac{(I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'}{2} \\
+\frac{m_1 * s_1^2}{2} + \frac{m_2 * s_2^2}{2} + \frac{ \overrightarrow{\omega}_1^T * I_1 * \overrightarrow{\omega}_1 }{2} + \frac{ \overrightarrow{\omega}_2^T * I_2 * \overrightarrow{\omega}_2 }{2} &=& \frac{m_1 * s_1'^2}{2} + \frac{m_2 * s_2'^2}{2} + \frac{ \overrightarrow{\omega}_1'^T * I_1 * \overrightarrow{\omega}_1' }{2} + \frac{ \overrightarrow{\omega}_2'^T * I_2 * \overrightarrow{\omega}_2' }{2} \\
 \vspace{10} \\
-m_1 * s_1^2 + m_2 * s_2^2 + (I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1 + (I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2 &=& m_1 * s_1'^2 + m_2 * s_2'^2 + (I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1' + (I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'
+m_1 * s_1^2 + m_2 * s_2^2 + \overrightarrow{\omega}_1^T * I_1 * \overrightarrow{\omega}_1 + \overrightarrow{\omega}_2^T * I_2 * \overrightarrow{\omega}_2 &=& m_1 * s_1'^2 + m_2 * s_2'^2 + \overrightarrow{\omega}_1'^T * I_1 * \overrightarrow{\omega}_1' + \overrightarrow{\omega}_2'^T * I_2 * \overrightarrow{\omega}_2'
 ```
 
 ## angular_energy_eqn2
 ```latex
-[0] + (I_1 * \overrightarrow{\omega}_1) \bullet \overrightarrow{\omega}_1 + (I_2 * \overrightarrow{\omega}_2) \bullet \overrightarrow{\omega}_2 &=& [2 * f * (\overrightarrow{v_1} \bullet \widehat{n}) + m_1^{-1} * f^2 - 2 * f * (\overrightarrow{v_2} \bullet \widehat{n}) + m_2^{-1} * f^2] + (I_1 * \overrightarrow{\omega}_1') \bullet \overrightarrow{\omega}_1' + (I_2 * \overrightarrow{\omega}_2') \bullet \overrightarrow{\omega}_2'
+[0] + (\overrightarrow{\omega}_1^T * I_1 * \overrightarrow{\omega}_1) + (\overrightarrow{\omega}_2^T * I_2 * \overrightarrow{\omega}_2) &=& [2 * f * (\overrightarrow{v_1} \bullet \widehat{n}) + m_1^{-1} * f^2 - 2 * f * (\overrightarrow{v_2} \bullet \widehat{n}) + m_2^{-1} * f^2] \\
+&& + (\overrightarrow{\omega}_1'^T * I_1 * \overrightarrow{\omega}_1') + (\overrightarrow{\omega}_2'^T * I_2 * \overrightarrow{\omega}_2') \\
+\vspace{10}
+(\overrightarrow{\omega}_1^T * I_1 * \overrightarrow{\omega}_1) + (\overrightarrow{\omega}_2^T * I_2 * \overrightarrow{\omega}_2) &=& [2 * (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} + m_1^{-1} * f + m_2^{-1} * f] * f \\
+&& + (\overrightarrow{\omega}_1'^T * I_1 * \overrightarrow{\omega}_1') + (\overrightarrow{\omega}_2'^T * I_2 * \overrightarrow{\omega}_2')
 ```
 
 ## angular_energy_eqn3
 ```latex
-(I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k + ... &=& ... + (I_k * \overrightarrow{\omega}_k') \bullet \overrightarrow{\omega}_k' \\
+(\overrightarrow{\omega}_k^T * I_k * \overrightarrow{\omega}_k) + ... &=& ... + (\overrightarrow{\omega}_k'^T * I_k * \overrightarrow{\omega}_k') \\
 \vspace{10} \\
-&=& ... + [I_k * (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
+&=& ... + (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))^T * I_k * (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
 \vspace{10} \\
-&=& ... + [I_k * \overrightarrow{\omega}_k \pm \overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
+&=& ... + \overrightarrow{\omega}_k^T * I_k * \overrightarrow{\omega}_k \pm (I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))^T * I_k * \overrightarrow{\omega}_k \\
+&& \pm \overrightarrow{\omega}_k^T * I_k * I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}) \\
+&& + (I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))^T * I_k * (I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
 ```
 
 ## angular_energy_eqn4
 ```latex
-(I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k + ... &=& ... + (I_k * \overrightarrow{\omega}_k) \bullet \overrightarrow{\omega}_k \pm (I_k * \overrightarrow{\omega}_k) \bullet [I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})] \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
-\vspace{10} \\
-0 + ... &=& ... \pm (I_k * \overrightarrow{\omega}_k) \bullet [I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})] \pm [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (\overrightarrow{\omega}_k \pm I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})) \\
-\vspace{10} \\
+0 + ... &=& ... \pm (\overrightarrow{p}_k \times (f * \widehat{n}))^T * I_k^{-1} * I_k * \overrightarrow{\omega}_k \\
+&& \pm \overrightarrow{\omega}_k^T * I_k * I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}) \\
+&& + [I_k^{-1} * (\overrightarrow{p}_k \times (f * \widehat{n}))]^T * I_k * I_k^{-1} * (\overrightarrow{p}_k \times (f * \widehat{n})) \\
+\vspace{10}
+&=& ... \pm 2 * (\overrightarrow{p}_k \times (f * \widehat{n})) \bullet \overrightarrow{\omega}_k \\
+&& + I_k^{-1} * (\overrightarrow{p}_k \times (f * \widehat{n})) \bullet (\overrightarrow{p}_k \times (f * \widehat{n})) \\
+\vspace{10}
+&=& ... \pm 2 * (\overrightarrow{p}_k \times \widehat{n}) \bullet \overrightarrow{\omega}_k * f \\
+&& + I_k^{-1} * (\overrightarrow{p}_k \times \widehat{n}) \bullet (\overrightarrow{p}_k \times \widehat{n}) * f^2
+```
+
+## angular_energy_eqn5
+```latex
+0 + ... &=& ... \pm 2 * (\overrightarrow{\omega}_k \times \overrightarrow{p}_k) \bullet \widehat{n} * f \\
+&& + I_k^{-1} * (\overrightarrow{p}_k \times \widehat{n}) \bullet (\overrightarrow{p}_k \times \widehat{n}) * f^2 \\
+\vspace{10}
+&=& ... \pm 2 * (\overrightarrow{\omega}_k \times \overrightarrow{p}_k) \bullet \widehat{n} * f \\
+&& + (I_k^{-1} * (\overrightarrow{p}_k \times \widehat{n}) \times \overrightarrow{p}_k) \bullet \widehat{n} * f^2
+```
+
+## angular_energy_eqn6
+```latex
+0 &=& [2 * (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} + m_1^{-1} * f + m_2^{-1} * f] * f \\
+&& + 2 * (\overrightarrow{\omega}_1 \times \overrightarrow{p}_1) \bullet \widehat{n} * f - 2 * (\overrightarrow{\omega}_2 \times \overrightarrow{p}_2) \bullet \widehat{n} * f \\
+&& + (I_1^{-1} * (\overrightarrow{p}_1 \times \widehat{n}) \times \overrightarrow{p}_1) \bullet \widehat{n} * f^2 + (I_2^{-1} * (\overrightarrow{p}_k \times \widehat{n}) \times \overrightarrow{p}_2) \bullet \widehat{n} * f^2 \\
+```
+
+## angular_energy_eqn7
+```latex
+0 &=& 2 * (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} * f \\
+&& + 2 * [ (\overrightarrow{\omega}_1 \times \overrightarrow{p}_1) - (\overrightarrow{\omega}_2 \times \overrightarrow{p}_2) ] \bullet \widehat{n} * f \\
+&& + (m_1^{-1} + m_2^{-1}) * f^2 \\
+&& + [I_1^{-1} * (\overrightarrow{p}_1 \times \widehat{n}) \times \overrightarrow{p}_1) + (I_2^{-1} * (\overrightarrow{p}_k \times \widehat{n}) \times \overrightarrow{p}_2) ] \bullet \widehat{n} * f^2 \\
+\vspace{10}
+&=& 2 * [\overrightarrow{v_1} + \overrightarrow{\omega}_1 \times \overrightarrow{p}_1 - (\overrightarrow{v_2} + \overrightarrow{\omega}_2 \times \overrightarrow{p}_2)) ] \bullet \widehat{n} * f \\
+&& + (m_1^{-1} + m_2^{-1}) * f^2 \\
+&& + [I_1^{-1} * (\overrightarrow{p}_1 \times \widehat{n}) \times \overrightarrow{p}_1) + (I_2^{-1} * (\overrightarrow{p}_k \times \widehat{n}) \times \overrightarrow{p}_2) ] \bullet \widehat{n} * f^2
 ```
 
 ```latex
-0 + ... &=& ... \pm (I_k * \overrightarrow{\omega}_k) \bullet [I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n})] \pm \overrightarrow{\omega}_k \bullet [\overrightarrow{p}_k \times (f * \widehat{n})] + [\overrightarrow{p}_k \times (f * \widehat{n})] \bullet (I_k^{-1} * \overrightarrow{p}_k \times (f * \widehat{n}))
+0 &=& [2 * (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} + m_1^{-1} * f + m_2^{-1} * f] \\
+&& + 2 * [ (\overrightarrow{p}_1 \times \widehat{n}) \bullet \overrightarrow{\omega}_1 - (\overrightarrow{p}_2 \times \widehat{n}) \bullet \overrightarrow{\omega}_2] \\
+&& + (\overrightarrow{p}_1 \times \widehat{n})^T * I_1^{-1} * \overrightarrow{p}_1 \times \widehat{n} * f + (\overrightarrow{p}_2 \times \widehat{n})^T * I_2^{-1} * \overrightarrow{p}_2 \times \widehat{n} * f
+```
+
+## angular_energy_eqn7
+```latex
+0 &=& [2 * (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} + m_1^{-1} * f + m_2^{-1} * f] \\
+&& + 2 * [ \widehat{n} \bullet (\overrightarrow{\omega}_1 \times \overrightarrow{p}_1) - \widehat{n} \bullet (\overrightarrow{\omega}_2 \times \overrightarrow{p}_2)] \\
+&& + (\overrightarrow{p}_1 \times \widehat{n})^T * I_1^{-1} * \overrightarrow{p}_1 \times \widehat{n} * f + (\overrightarrow{p}_2 \times \widehat{n})^T * I_2^{-1} * \overrightarrow{p}_2 \times \widehat{n} * f \\
+\vspace{10}
+&=& [2 * (\overrightarrow{v_1} - \overrightarrow{v_2}) \bullet \widehat{n} + m_1^{-1} * f + m_2^{-1} * f] \\
+&& + 2 * [(\overrightarrow{\omega}_1 \times \overrightarrow{p}_1 - \overrightarrow{\omega}_2 \times \overrightarrow{p}_2) \bullet \widehat{n} \\
+&& + (\overrightarrow{p}_1 \times \widehat{n})^T * I_1^{-1} * \overrightarrow{p}_1 \times \widehat{n} * f + (\overrightarrow{p}_2 \times \widehat{n})^T * I_2^{-1} * \overrightarrow{p}_2 \times \widehat{n} * f
+```
+
+## angular_energy_eqn8
+```latex
+0 &=& 2 * [ (\overrightarrow{v_1} + \overrightarrow{\omega}_1 \times \overrightarrow{p}_1 - (\overrightarrow{v_2} + \overrightarrow{\omega}_2 \times \overrightarrow{p}_2) ] \bullet \widehat{n} \\
+&& + [ m_1^{-1} + m_2^{-1} + (\overrightarrow{p}_1 \times \widehat{n})^T * I_1^{-1} * \overrightarrow{p}_1 \times \widehat{n} + (\overrightarrow{p}_2 \times \widehat{n})^T * I_2^{-1} * \overrightarrow{p}_2 \times \widehat{n} ] * f
 ```
 
 ## angular_final_solution
