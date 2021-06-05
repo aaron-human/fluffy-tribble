@@ -326,7 +326,7 @@ impl PhysicsSystem {
 
 		let mut time_left = dt;
 		let mut concluded = false;
-		for iteration in 0..self.iteration_max {
+		for _iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
 			// Will be "done" once no collisions left or run out of iterations.
 
@@ -334,7 +334,9 @@ impl PhysicsSystem {
 			let mut earliest_collision_percent = 1.0; // Collisions must happen before 100% of time_left.
 			let mut earliest_collision = None;
 			let mut earliest_collision_restitution = 1.0;
-			let mut earliest_collision_friction_coefficient = 0.0;
+			let mut earliest_collision_static_friction_coefficient : f32 = 0.0;
+			let mut earliest_collision_dynamic_friction_coefficient : f32 = 0.0;
+			let mut earliest_collision_friction_threshold : f32 = 0.0;
 			let mut earliest_collision_first_entity_handle = None;
 			let mut earliest_collision_second_entity_handle = None;
 			let mut earliest_collision_first_info_index = 0;
@@ -392,7 +394,9 @@ impl PhysicsSystem {
 									earliest_collision_percent = time;
 									earliest_collision = Some(collision);
 									earliest_collision_restitution = first_collider_box.get_restitution_coefficient() *  second_collider_box.get_restitution_coefficient();
-									earliest_collision_friction_coefficient = first_collider_box.get_friction_coefficient() *  second_collider_box.get_friction_coefficient();
+									earliest_collision_static_friction_coefficient = first_collider_box.get_static_friction_coefficient() *  second_collider_box.get_static_friction_coefficient();
+									earliest_collision_dynamic_friction_coefficient = first_collider_box.get_dynamic_friction_coefficient() *  second_collider_box.get_dynamic_friction_coefficient();
+									earliest_collision_friction_threshold = first_collider_box.get_friction_threshold() *  second_collider_box.get_friction_threshold();
 									earliest_collision_first_entity_handle = Some(first_entity_info.handle);
 									earliest_collision_second_entity_handle = Some(second_entity_info.handle);
 									earliest_collision_first_info_index = first_index;
@@ -426,34 +430,65 @@ impl PhysicsSystem {
 				let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
 
 				let (first_option, second_option) = entities.get2_mut(first_entity_handle, second_entity_handle);
-				let first  = first_option.unwrap();
-				let second = second_option.unwrap();
+				let mut first  = first_option.unwrap();
+				let mut second = second_option.unwrap();
 
 				let impulse = PhysicsSystem::calc_collision_impulse(
 					&first,
 					&second,
 					earliest_collision_restitution,
-					earliest_collision_friction_coefficient,
 					&collision,
 				);
 
-				{
-					// Apply the impluse and re-integrate the movement.
-					let info = &mut entity_info[earliest_collision_first_info_index];
+				PhysicsSystem::apply_collision_impulse(
+					&mut first,
+					&mut entity_info[earliest_collision_first_info_index],
+					&collision.position,
+					&impulse,
+					time_after_collision,
+				);
+				PhysicsSystem::apply_collision_impulse(
+					&mut second,
+					&mut entity_info[earliest_collision_second_info_index],
+					&collision.position,
+					&-impulse,
+					time_after_collision,
+				);
 
-					first.apply_impulse(&collision.position, &impulse);
+				{// Then figure out friction.
+					let first_velocity  = first.get_velocity_at_world_position(&collision.position);
+					let second_velocity = second.get_velocity_at_world_position(&collision.position);
+					let velocity_delta = first_velocity - second_velocity;
+					let normal_coincidence = velocity_delta.dot(&collision.normal);
+					let sliding = velocity_delta - collision.normal * normal_coincidence;
+					let sliding_magnitude = sliding.magnitude();
+					// NOTE: The below defaults to the dynamic friction coefficient if the ratio is junk.
+					let friction_coefficient = if normal_coincidence.abs() / sliding_magnitude < earliest_collision_friction_threshold {
+						earliest_collision_static_friction_coefficient
+					} else {
+						earliest_collision_dynamic_friction_coefficient
+					};
+					let denominator = PhysicsSystem::calc_collision_impulse_denominator(first, second, &collision);
+					let max_friction_impulse = sliding_magnitude / denominator; // Divide by denominator so the mass/inertia split is reasonable.
+					let mut friction_percent : f32 = (impulse.magnitude() * friction_coefficient) / max_friction_impulse;
+					if friction_percent > 1.0 { friction_percent = 1.0; }
+					if !friction_percent.is_finite() { friction_percent = 0.0; }
+					let friction_impulse = sliding * -friction_percent;
 
-					info.linear_movement = first.velocity * time_after_collision;
-					info.angular_movement = first.angular_velocity * time_after_collision;
-				}
-				{
-					// Apply the impulse and re-integrate the movement.
-					let info = &mut entity_info[earliest_collision_second_info_index];
-
-					second.apply_impulse(&collision.position, &-impulse);
-
-					info.linear_movement = second.velocity * time_after_collision;
-					info.angular_movement = second.angular_velocity * time_after_collision;
+					PhysicsSystem::apply_collision_impulse(
+						&mut first,
+						&mut entity_info[earliest_collision_first_info_index],
+						&collision.position,
+						&friction_impulse,
+						time_after_collision,
+					);
+					PhysicsSystem::apply_collision_impulse(
+						&mut second,
+						&mut entity_info[earliest_collision_second_info_index],
+						&collision.position,
+						&-friction_impulse,
+						time_after_collision,
+					);
 				}
 			} else {
 				//self.debug.push(format!("Collisions handled after {} iterations.", iteration+1));
@@ -466,10 +501,21 @@ impl PhysicsSystem {
 		}
 	}
 
-	/// Calculates the collision impulse between two entities.
-	fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, friction_coefficient : f32, collision : &Collision) -> Vec3 {
+	fn calc_collision_impulse_denominator(first : &InternalEntity, second : &InternalEntity, collision : &Collision) -> f32 {
 		let first_offset  = collision.position - first.orientation.position;
 		let second_offset = collision.position - second.orientation.position;
+
+		let first_linear_weight   = 1.0 / first.get_total_mass();
+		let second_linear_weight  = 1.0 / second.get_total_mass();
+		let first_angular_amount = first.get_inverse_moment_of_inertia()   * first_offset.cross( &collision.normal);
+		let first_angular_weight  = first_angular_amount.cross(&first_offset).dot( &collision.normal);
+		let second_angular_amount = second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal);
+		let second_angular_weight = second_angular_amount.cross(&second_offset).dot(&collision.normal);
+		first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight
+	}
+
+	/// Calculates the collision impulse between two entities.
+	fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, collision : &Collision) -> Vec3 {
 
 		let first_full_velocity  = first.get_velocity_at_world_position( &collision.position);
 		let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
@@ -478,31 +524,18 @@ impl PhysicsSystem {
 		// First find the collision response along the normal.
 		let normal_coincidence = velocity_delta.dot(&collision.normal);
 		let numerator = -(1.0 + restitution_coefficient) * normal_coincidence;
-		let first_linear_weight   = 1.0 / first.get_total_mass();
-		let second_linear_weight  = 1.0 / second.get_total_mass();
-		let first_angular_amount = first.get_inverse_moment_of_inertia()   * first_offset.cross( &collision.normal);
-		let first_angular_weight  = first_angular_amount.cross(&first_offset).dot( &collision.normal);
-		let second_angular_amount = second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal);
-		let second_angular_weight = second_angular_amount.cross(&second_offset).dot(&collision.normal);
-		let denominator = first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight;
+		let denominator = PhysicsSystem::calc_collision_impulse_denominator(first, second, collision);
 		let normal_impulse_magnitude = numerator / denominator;
-		let impulse = collision.normal.scale(normal_impulse_magnitude);
+		collision.normal.scale(normal_impulse_magnitude)
+	}
 
-		// Then use that to figure out the response perpendicular to the normal.
-		let resulting_velocity_delta = impulse.scale(first_linear_weight + second_linear_weight).magnitude();
-		let mut sliding = Vec3::zeros();
-		if resulting_velocity_delta < 0.1 { // TODO: Switch this over to the Coulomb friction model? So get the new/updated relative velocity at the point of collision and decide friction based on that...
-			// Alternately could go nuts and try to setup an integration-based approach and switch between the two depending on how the collision's properties work out...
-			sliding = velocity_delta - collision.normal * normal_coincidence;
-			let total_sliding_magnitude    = sliding.magnitude() / denominator;
-			let mut max_friction_magnitude = (normal_impulse_magnitude * friction_coefficient).abs();
-			if max_friction_magnitude > total_sliding_magnitude {
-				max_friction_magnitude = total_sliding_magnitude;
-			}
-			sliding *= -(max_friction_magnitude / total_sliding_magnitude);
-		}
+	/// Applies a collision impulse.
+	fn apply_collision_impulse(entity : &mut InternalEntity, entity_step_info : &mut EntityStepInfo, collision_position : &Vec3, impulse : &Vec3, remaining_time : f32) {
 
-		impulse + sliding
+		entity.apply_impulse(&collision_position, &impulse);
+
+		entity_step_info.linear_movement = entity.velocity * remaining_time;
+		entity_step_info.angular_movement = entity.angular_velocity * remaining_time;
 	}
 }
 

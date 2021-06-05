@@ -22,8 +22,14 @@ pub struct InternalPlaneCollider {
 	/// The restituion coefficient.
 	pub restitution_coefficient : f32,
 
-	/// The friction coefficient. Should always at or between 0.0 and 1.0.
-	pub friction_coefficient : f32,
+	/// The ratio used to decide whether to use static friction or dynamic friction.
+	pub friction_threshold : f32,
+
+	/// The static friction coefficient. Should always at or between 0.0 and 1.0.
+	pub static_friction_coefficient : f32,
+
+	/// The dynamic friction coefficient. Should always at or between 0.0 and 1.0.
+	pub dynamic_friction_coefficient : f32,
 }
 
 impl InternalPlaneCollider {
@@ -38,7 +44,9 @@ impl InternalPlaneCollider {
 				normal: source.normal.normalize(),
 				mass: source.mass,
 				restitution_coefficient: source.restitution_coefficient,
-				friction_coefficient: source.friction_coefficient,
+				friction_threshold: source.friction_threshold,
+				static_friction_coefficient: source.static_friction_coefficient,
+				dynamic_friction_coefficient: source.dynamic_friction_coefficient,
 			}))
 		}
 	}
@@ -51,7 +59,9 @@ impl InternalPlaneCollider {
 			normal: self.normal.clone(),
 			mass: self.mass,
 			restitution_coefficient: self.restitution_coefficient,
-			friction_coefficient: self.friction_coefficient,
+			friction_threshold: self.friction_threshold,
+			static_friction_coefficient: self.static_friction_coefficient,
+			dynamic_friction_coefficient: self.dynamic_friction_coefficient,
 		}
 	}
 
@@ -64,7 +74,9 @@ impl InternalPlaneCollider {
 			self.normal = source.normal;
 			self.mass = source.mass;
 			self.restitution_coefficient = source.restitution_coefficient;
-			self.friction_coefficient = source.friction_coefficient;
+			self.friction_threshold = source.friction_threshold;
+			self.static_friction_coefficient = source.static_friction_coefficient;
+			self.dynamic_friction_coefficient = source.dynamic_friction_coefficient;
 			Ok(())
 		}
 	}
@@ -95,7 +107,11 @@ impl InternalCollider for InternalPlaneCollider {
 
 	fn get_restitution_coefficient(&self) -> f32 { self.restitution_coefficient }
 
-	fn get_friction_coefficient(&self) -> f32 { self.friction_coefficient }
+	fn get_friction_threshold(&self) -> f32 { self.friction_threshold }
+
+	fn get_static_friction_coefficient(&self) -> f32 { self.static_friction_coefficient }
+
+	fn get_dynamic_friction_coefficient(&self) -> f32 { self.dynamic_friction_coefficient }
 }
 
 /// A copy of all of the publicly-accessible properties of an infinite plane collider.
@@ -136,10 +152,20 @@ pub struct PlaneCollider {
 	/// Defaults to one.
 	pub restitution_coefficient : f32,
 
-	/// The friction coefficient. Should always at or between 0.0 and 1.0.
+	/// The ratio used to threshold whether to use static or dynamic friction for a given collision.
 	///
-	/// Defaults to zero.
-	pub friction_coefficient : f32,
+	/// Defaults to `1.0`.
+	pub friction_threshold : f32,
+
+	/// The static friction coefficient. Should always at or between 0.0 and 1.0.
+	///
+	/// Defaults to `0.25`.
+	pub static_friction_coefficient : f32,
+
+	/// The dynamic friction coefficient. Should always at or between 0.0 and 1.0.
+	///
+	/// Defaults to `0.3`.
+	pub dynamic_friction_coefficient : f32,
 }
 
 impl PlaneCollider {
@@ -151,7 +177,9 @@ impl PlaneCollider {
 			normal: Vec3::y(),
 			mass: 0.0,
 			restitution_coefficient: 1.0,
-			friction_coefficient: 0.0,
+			friction_threshold: 0.25,
+			static_friction_coefficient: 1.0,
+			dynamic_friction_coefficient: 0.3,
 		}
 	}
 

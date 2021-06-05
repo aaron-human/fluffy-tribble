@@ -74,7 +74,11 @@ impl InternalCollider for InternalNullCollider {
 
 	fn get_restitution_coefficient(&self) -> f32 { 0.0 }
 
-	fn get_friction_coefficient(&self) -> f32 { 0.0 }
+	fn get_friction_threshold(&self) -> f32 { 1.0 }
+
+	fn get_static_friction_coefficient(&self) -> f32 { 0.0 }
+
+	fn get_dynamic_friction_coefficient(&self) -> f32 { 0.0 }
 }
 
 /// A collider that doesn't collide. Instead it just provides mass and inertia at a point.
