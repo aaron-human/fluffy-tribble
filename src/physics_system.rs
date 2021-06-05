@@ -334,6 +334,7 @@ impl PhysicsSystem {
 			let mut earliest_collision_percent = 1.0; // Collisions must happen before 100% of time_left.
 			let mut earliest_collision = None;
 			let mut earliest_collision_restitution = 1.0;
+			let mut earliest_collision_friction_coefficient = 0.0;
 			let mut earliest_collision_first_entity_handle = None;
 			let mut earliest_collision_second_entity_handle = None;
 			let mut earliest_collision_first_info_index = 0;
@@ -390,7 +391,8 @@ impl PhysicsSystem {
 								if time < earliest_collision_percent {
 									earliest_collision_percent = time;
 									earliest_collision = Some(collision);
-									earliest_collision_restitution = first_collider_box.get_restitution_coefficient() *  second_collider_box.get_restitution_coefficient() ;
+									earliest_collision_restitution = first_collider_box.get_restitution_coefficient() *  second_collider_box.get_restitution_coefficient();
+									earliest_collision_friction_coefficient = first_collider_box.get_friction_coefficient() *  second_collider_box.get_friction_coefficient();
 									earliest_collision_first_entity_handle = Some(first_entity_info.handle);
 									earliest_collision_second_entity_handle = Some(second_entity_info.handle);
 									earliest_collision_first_info_index = first_index;
@@ -431,6 +433,7 @@ impl PhysicsSystem {
 					&first,
 					&second,
 					earliest_collision_restitution,
+					earliest_collision_friction_coefficient,
 					&collision,
 				);
 
@@ -464,7 +467,7 @@ impl PhysicsSystem {
 	}
 
 	/// Calculates the collision impulse between two entities.
-	fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, collision : &Collision) -> Vec3 {
+	fn calc_collision_impulse(first : &InternalEntity, second : &InternalEntity, restitution_coefficient : f32, friction_coefficient : f32, collision : &Collision) -> Vec3 {
 		let first_offset  = collision.position - first.orientation.position;
 		let second_offset = collision.position - second.orientation.position;
 
@@ -472,7 +475,9 @@ impl PhysicsSystem {
 		let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
 		let velocity_delta = first_full_velocity - second_full_velocity;
 
-		let numerator = -(1.0 + restitution_coefficient) * velocity_delta.dot(&collision.normal);
+		// First find the collision response along the normal.
+		let normal_coincidence = velocity_delta.dot(&collision.normal);
+		let numerator = -(1.0 + restitution_coefficient) * normal_coincidence;
 		let first_linear_weight   = 1.0 / first.get_total_mass();
 		let second_linear_weight  = 1.0 / second.get_total_mass();
 		let first_angular_amount = first.get_inverse_moment_of_inertia()   * first_offset.cross( &collision.normal);
@@ -480,8 +485,24 @@ impl PhysicsSystem {
 		let second_angular_amount = second.get_inverse_moment_of_inertia() * second_offset.cross(&collision.normal);
 		let second_angular_weight = second_angular_amount.cross(&second_offset).dot(&collision.normal);
 		let denominator = first_linear_weight + second_linear_weight + first_angular_weight + second_angular_weight;
+		let normal_impulse_magnitude = numerator / denominator;
+		let impulse = collision.normal.scale(normal_impulse_magnitude);
 
-		collision.normal.scale(numerator / denominator)
+		// Then use that to figure out the response perpendicular to the normal.
+		let resulting_velocity_delta = impulse.scale(first_linear_weight + second_linear_weight).magnitude();
+		let mut sliding = Vec3::zeros();
+		if resulting_velocity_delta < 0.1 { // TODO: Switch this over to the Coulomb friction model? So get the new/updated relative velocity at the point of collision and decide friction based on that...
+			// Alternately could go nuts and try to setup an integration-based approach and switch between the two depending on how the collision's properties work out...
+			sliding = velocity_delta - collision.normal * normal_coincidence;
+			let total_sliding_magnitude    = sliding.magnitude() / denominator;
+			let mut max_friction_magnitude = (normal_impulse_magnitude * friction_coefficient).abs();
+			if max_friction_magnitude > total_sliding_magnitude {
+				max_friction_magnitude = total_sliding_magnitude;
+			}
+			sliding *= -(max_friction_magnitude / total_sliding_magnitude);
+		}
+
+		impulse + sliding
 	}
 }
 

@@ -42,6 +42,9 @@ pub trait InternalCollider : Downcast + Debug {
 
 	/// Gets the coefficient of restitution for this instance.
 	fn get_restitution_coefficient(&self) -> f32;
+
+	/// Gets the friction coefficient.
+	fn get_friction_coefficient(&self) -> f32;
 }
 
 impl dyn InternalCollider {

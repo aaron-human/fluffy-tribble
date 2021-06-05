@@ -23,6 +23,9 @@ pub struct InternalMeshCollider {
 
 	/// The restituion coefficient.
 	pub restitution_coefficient : f32,
+
+	/// The friction coefficient. Should always at or between 0.0 and 1.0.
+	pub friction_coefficient : f32,
 }
 
 impl InternalMeshCollider {
@@ -38,6 +41,7 @@ impl InternalMeshCollider {
 				faces: source.faces.clone(),
 				edges: source.edges.clone(),
 				restitution_coefficient: source.restitution_coefficient,
+				friction_coefficient: source.friction_coefficient,
 			}))
 		}
 	}
@@ -51,6 +55,7 @@ impl InternalMeshCollider {
 			faces: self.faces.clone(),
 			edges: self.edges.clone(),
 			restitution_coefficient: self.restitution_coefficient,
+			friction_coefficient: self.friction_coefficient,
 		}
 	}
 
@@ -64,6 +69,7 @@ impl InternalMeshCollider {
 			self.faces = source.faces.clone();
 			self.edges = source.edges.clone();
 			self.restitution_coefficient = source.restitution_coefficient;
+			self.friction_coefficient = source.friction_coefficient;
 			Ok(())
 		}
 	}
@@ -102,6 +108,8 @@ impl InternalCollider for InternalMeshCollider {
 	fn get_moment_of_inertia_tensor(&self) -> Mat3 { Mat3::zeros() }
 
 	fn get_restitution_coefficient(&self) -> f32 { self.restitution_coefficient }
+
+	fn get_friction_coefficient(&self) -> f32 { self.friction_coefficient }
 }
 
 /// A copy of all of the publicly-accessible properties of a mesh collider.
@@ -138,6 +146,11 @@ pub struct MeshCollider {
 	///
 	/// Defaults to one.
 	pub restitution_coefficient : f32,
+
+	/// The friction coefficient. Should always at or between 0.0 and 1.0.
+	///
+	/// Defaults to zero.
+	pub friction_coefficient : f32,
 }
 
 impl MeshCollider {
@@ -152,6 +165,7 @@ impl MeshCollider {
 			faces: Vec::new(),
 			edges: Vec::new(),
 			restitution_coefficient: 1.0,
+			friction_coefficient: 0.0,
 		}
 	}
 

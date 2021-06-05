@@ -73,6 +73,8 @@ impl InternalCollider for InternalNullCollider {
 	fn get_moment_of_inertia_tensor(&self) -> Mat3 { self.moment_of_inertia }
 
 	fn get_restitution_coefficient(&self) -> f32 { 0.0 }
+
+	fn get_friction_coefficient(&self) -> f32 { 0.0 }
 }
 
 /// A collider that doesn't collide. Instead it just provides mass and inertia at a point.

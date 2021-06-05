@@ -23,6 +23,9 @@ pub struct InternalSphereCollider {
 
 	/// The restituion coefficient.
 	pub restitution_coefficient : f32,
+
+	/// The friction coefficient. Should always at or between 0.0 and 1.0.
+	pub friction_coefficient : f32,
 }
 
 impl InternalSphereCollider {
@@ -37,6 +40,7 @@ impl InternalSphereCollider {
 				radius: source.radius,
 				mass: source.mass,
 				restitution_coefficient: source.restitution_coefficient,
+				friction_coefficient: source.friction_coefficient,
 			}))
 		}
 	}
@@ -49,6 +53,7 @@ impl InternalSphereCollider {
 			radius: self.radius,
 			mass: self.mass,
 			restitution_coefficient: self.restitution_coefficient,
+			friction_coefficient: self.friction_coefficient,
 		}
 	}
 
@@ -61,6 +66,7 @@ impl InternalSphereCollider {
 			self.radius = source.radius;
 			self.mass = source.mass;
 			self.restitution_coefficient = source.restitution_coefficient;
+			self.friction_coefficient = source.friction_coefficient;
 			Ok(())
 		}
 	}
@@ -93,6 +99,8 @@ impl InternalCollider for InternalSphereCollider {
 	}
 
 	fn get_restitution_coefficient(&self) -> f32 { self.restitution_coefficient }
+
+	fn get_friction_coefficient(&self) -> f32 { self.friction_coefficient }
 }
 
 /// A copy of all of the publicly-accessible properties of a spherical collider.
@@ -122,6 +130,11 @@ pub struct SphereCollider {
 	///
 	/// Defaults to one.
 	pub restitution_coefficient : f32,
+
+	/// The friction coefficient. Should always at or between 0.0 and 1.0.
+	///
+	/// Defaults to zero.
+	pub friction_coefficient : f32,
 }
 
 impl SphereCollider {
@@ -133,6 +146,7 @@ impl SphereCollider {
 			radius,
 			mass: 0.0,
 			restitution_coefficient: 1.0,
+			friction_coefficient: 0.0,
 		}
 	}
 
