@@ -141,6 +141,50 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 		}
 	}
 
+	if ColliderType::MESH == collider1.get_type() && ColliderType::PLANE == collider2.get_type() {
+		let mesh  = collider1.downcast_ref::<InternalMeshCollider>().unwrap();
+
+		let plane = collider2.downcast_ref::<InternalPlaneCollider>().unwrap();
+		let plane_start_position = start2.position_into_world(&plane.position);
+		let plane_end_position = end2.position_into_world(&plane.position);
+
+		return collide_mesh_with_plane(
+			&mesh.vertices,
+			&mesh.position,
+			start1,
+			end1,
+			&plane_start_position,
+			&plane_end_position,
+			&plane.normal,
+		);
+	}
+
+	if ColliderType::PLANE == collider1.get_type() && ColliderType::MESH == collider2.get_type() {
+
+		let plane = collider1.downcast_ref::<InternalPlaneCollider>().unwrap();
+		let plane_start_position = start1.position_into_world(&plane.position);
+		let plane_end_position = end1.position_into_world(&plane.position);
+
+		let mesh  = collider2.downcast_ref::<InternalMeshCollider>().unwrap();
+
+		let collision_option = collide_mesh_with_plane(
+			&mesh.vertices,
+			&mesh.position,
+			start2,
+			end2,
+			&plane_start_position,
+			&plane_end_position,
+			&plane.normal,
+		);
+		// Must negate the normal as the mesh is the second collider.
+		if let Some(mut collision) = collision_option {
+			collision.normal *= -1.0;
+			return Some(collision);
+		} else {
+			return None
+		}
+	}
+
 	None
 }
 
@@ -362,6 +406,48 @@ pub fn collide_sphere_with_mesh(radius1 : f32, center1: &Vec3, movement1 : &Vec3
 	accumulator.get()
 }
 
+/// Collides a mesh with an (infinite) plane.
+pub fn collide_mesh_with_plane(mesh_vertices : &Vec<Vec3>, mesh_position : &Vec3, mesh_start_orientation : &Orientation, mesh_end_orientation : &Orientation, plane_start_position : &Vec3, plane_end_position : &Vec3, plane_normal : &Vec3) -> Option<Collision> {
+	let mut start_distances = Range::empty();
+	let mut end_distances = Range::empty();
+	let mut closest_start_position = Vec3::zeros();
+	let mut closest_end_position = Vec3::zeros();
+	for vertex in mesh_vertices {
+		let internal_vertex_position = mesh_position + vertex;
+		let mesh_start_position = mesh_start_orientation.position_into_world(&internal_vertex_position);
+		let mesh_end_position = mesh_end_orientation.position_into_world(&internal_vertex_position);
+
+		let start_distance = (mesh_start_position - plane_start_position).dot(plane_normal);
+		let end_distance   = (mesh_end_position   - plane_end_position).dot(plane_normal);
+
+		start_distances = start_distances.contain(&Range::single(start_distance));
+		end_distances   = end_distances.contain(&Range::single(end_distance));
+
+		if start_distances.min() == start_distance {
+			closest_start_position = mesh_start_position;
+		}
+		if end_distances.min() == end_distance {
+			closest_end_position = mesh_end_position;
+		}
+	}
+
+	let times = Range::range(-INFINITY, 0.0).linear_overlap(
+		&start_distances,
+		end_distances.min() - start_distances.min()
+	).intersect(&Range::range(0.0, 1.0));
+
+	if !times.is_empty() {
+		let time = times.min();
+		Some(Collision {
+			times: times,
+			position: closest_start_position * (1.0 - time) + closest_end_position * time,
+			normal: -plane_normal,
+		})
+	} else {
+		None
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::consts::EPSILON;
@@ -574,6 +660,79 @@ mod tests {
 			);
 			println!("no hit? {:?}", hit);
 			assert!(hit.is_none());
+		}
+	}
+
+
+	#[test]
+	fn check_collide_mesh_with_plane() {
+		let vertices = vec![
+			Vec3::new(0.0, 0.0, 0.0),
+			Vec3::new(1.0, 1.0, 1.0),
+		];
+		{ // A clean hit.
+			let hit = collide_mesh_with_plane(
+				&vertices,
+				&Vec3::new(0.0, 0.0, 0.0),
+				&Orientation::new(
+					&Vec3::new(0.0, 0.0, 0.0),
+					&Vec3::zeros(),
+					&Vec3::zeros(),
+				),
+				&Orientation::new(
+					&Vec3::new(0.0, 0.0, 2.0),
+					&Vec3::zeros(),
+					&Vec3::zeros(),
+				),
+				&Vec3::new(0.0, 0.0, 2.0),
+				&Vec3::new(0.0, 0.0, 2.0),
+				&Vec3::new(0.0, 0.0,-1.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(1.0, 1.0, 2.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
+		}
+		{ // A miss.
+			let hit = collide_mesh_with_plane(
+				&vertices,
+				&Vec3::new(0.0, 0.0, 0.0),
+				&Orientation::new(
+					&Vec3::new(0.0, 0.0, 0.0),
+					&Vec3::zeros(),
+					&Vec3::zeros(),
+				),
+				&Orientation::new(
+					&Vec3::new(0.0, 0.0, 2.0),
+					&Vec3::zeros(),
+					&Vec3::zeros(),
+				),
+				&Vec3::new(0.0, 0.0, 2.0),
+				&Vec3::new(0.0, 0.0, 8.0),
+				&Vec3::new(0.0, 0.0,-1.0),
+			);
+			assert!(hit.is_none());
+		}
+		{ // A hit due to being embedded.
+			let hit = collide_mesh_with_plane(
+				&vertices,
+				&Vec3::new(0.0, 0.0, 0.0),
+				&Orientation::new(
+					&Vec3::new(0.0, 0.0, 0.0),
+					&Vec3::zeros(),
+					&Vec3::zeros(),
+				),
+				&Orientation::new(
+					&Vec3::new(0.0, 0.0, 2.0),
+					&Vec3::zeros(),
+					&Vec3::zeros(),
+				),
+				&Vec3::new(0.0, 0.0,-10.0),
+				&Vec3::new(0.0, 0.0,-10.0),
+				&Vec3::new(0.0, 0.0,-1.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.0).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(1.0, 1.0, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
 		}
 	}
 }
