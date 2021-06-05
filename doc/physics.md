@@ -160,8 +160,6 @@ rotation_vector = unit_length_axis_of_rotation_vector * rotation_amount_in_radia
 
 So the vector's direction is the axis of rotation, and it's length is how much to rotate (according to the right-hand-rule). This notation is extremely versatile as, perhaps surprisingly, simple vector addition between two rotation vectors exactly maps to just applying both rotations in series. Or at least it does so well enough that pretty much all math here does that to model things.
 
-
-
 Now with that, it's next important to understand how linear energy is moved into rotation. That is to say, it's time to start using cross product. Now if a force is applied to an object, then it can rotate the object by producing a torque, which is calculated by:
 
 ```
@@ -178,7 +176,7 @@ angular_velocity X (p - center_of_mass) = linear_velocity_at_p
 
 This will become useful later when discussing collisions.
 
-Now back to foundational angular motion concepts. The **center of mass** is important as it's basically the "true center" of the object when it comes to rotations. That is to say, applying a force directly at the center of mass won't cause the object to rotate, because all mass is "balanced" across any line that goes through that point. This is encoded in the above equation as the cross product between any two parallel vectors is always zero.
+Now back to foundational angular motion concepts. The **center of mass** is important as it's basically the "true center" of the object when it comes to rotations. That is to say, applying a force directly at the center of mass won't cause the object to rotate, because all mass is "balanced" across any line that goes through that point. This is encoded in the above equation as the cross product between any two parallel vectors is always zero, so if the `offset` and the `force_vector` are pointing along the same direction, they produce a zero `torque`.
 
 With that in mind, the next bit of physics that needs introducing is the concept of **moment of inertia**. In a nut-shell, it describes how hard it is to rotate an object about some specific axis. Note that the *specific axis* part is key; whenever a moment of inertia is described in physics contexts it's always about some implicit axis that's been pre-determined. As a result it is a *scalar value*.
 
@@ -191,7 +189,7 @@ However, as described above, rotations in the physics engine are going to be abo
 Moment of inertia tensor * some normal =             vector of moments of inertia
 ```
 
-This might seem horribly confusing (and it will become so later on), but for now it actually makes everything really simple, because for any of the simple (i.e. one-dimensional) angular motion equations that require the *scalar* moment of inertia, one can usually just drop in the correct moment of inertia tensor and switch everything else to vectors and everything will just work.
+This might seem horribly confusing (and it will become so later on), but for now it actually makes everything really simple, because for any of the simple (i.e. one-dimensional) angular motion equations that require the *scalar* moment of inertia, one can usually just drop in the correct moment of inertia tensor and switch everything else to vectors and everything will just work. (And it "just works" because doing that converts the one equation into a system of 3 equations, where each describes movement along one of the orthogonal axes.)
 
 (Though the *correct* moment of inertia tensor is complicated to calculate. And you have to be vary careful to *_always_* use the center of mass to represent the object. More on that later.)
 
@@ -212,7 +210,7 @@ angular_acceleration = inverse_moment_of_inertia_tensor * (offset X force_vector
 
 So now there's a way to go from a forces applied to the surface to angular acceleration.
 
-To complete the analog with the _Linear Kinetic Motion_ section, angular movement it's possible to calculate the energy stored in rotation with:
+To get things setup for the next section, here's how the energy stored in an angular movement is calculated:
 
 ```
 energy = 0.5 * transposed_angular_velocity * inverse_moment_of_inertia_tensor * angular_velocity
@@ -220,13 +218,13 @@ energy = 0.5 * transposed_angular_velocity * inverse_moment_of_inertia_tensor * 
 
 As with before, the total energy may or may not be conserved depending on the `restitution_coefficient`.
 
-Note that the transpose in the above is basically interchangeable with a dot product:
+Note that the transposed multiplication in the above is basically interchangeable with a dot product:
 
 ```
 energy = 0.5 * angular_velocity dot (inverse_moment_of_inertia_tensor * angular_velocity)
 ```
 
-Before diving into the derivation of the collision response, it's worth setting up one last thing: figuring out the _total_ velocity at a point. Since an object could conceivably have it's center of mass completely immobile but be spinning, obviously the angular velocity must contribute something to the value. Luckily this is just as easy as adding the linear and angular velocity equations above together:
+Before diving into the derivation of the collision response, it's worth setting up one last thing: figuring out the _total_ velocity at a point. Since an object could conceivably have it's center of mass completely immobile but be spinning, obviously the angular velocity must contribute something to the value. Luckily this is as easy as adding the linear and angular velocity equations above together:
 
 ```
 total_velocity_at_p = linear_velocity_of_center_of_mass + angular_velocity X offset
@@ -292,7 +290,7 @@ Then the angular kinetic energy can receive a similar treatment:
 
 ![angular energy eqn5](./img/angular_energy_eqn5.png)
 
-At this point everything on the left of the equation has been canceled, so the full equation looks like the below. Similar to the linear section, since there's an `f` in every term, (and `f` cannot be zero) one `f` can be removed.
+At this point everything on the left of the equation has been canceled, so the full equation looks like the below. Similar to the linear section, since there's an `f` in every term, (and `f` cannot be zero) one `f` can be divided out of every term.
 
 ![angular energy eqn6](./img/angular_energy_eqn6.png)
 
