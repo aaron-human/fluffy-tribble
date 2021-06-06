@@ -7,5 +7,3 @@ Add a rectangle collider.
 Add some sort of "rolling friction" drag?
 
 More efficient collision detection.
-
-Colliders that have no collision, they just add mass to an entity at a position?

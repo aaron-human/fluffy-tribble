@@ -1,10 +1,10 @@
 use std::f32::INFINITY;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 use generational_arena::Arena;
 
 use crate::consts::EPSILON;
-use crate::types::{Vec3, Mat3, Quat, ColliderHandle};
+use crate::types::{Vec3, Mat3, Quat, ColliderHandle, EntityHandle};
 use crate::collider::InternalCollider;
 use crate::orientation::Orientation;
 
@@ -36,6 +36,14 @@ pub struct InternalEntity {
 
 	/// All colliders that are attached/linked to this.
 	pub colliders : HashSet<ColliderHandle>,
+
+	/// Whether this has been put to sleep.
+	pub asleep : bool,
+
+	/// Other entities to wake up when this entity wakes up.
+	/// These are also the entities that won't wake up this entity if they're colliding with it (and vise versa).
+	/// This should always be empty if the entity isn't asleep.
+	pub neighbors : HashSet<EntityHandle>,
 }
 
 impl InternalEntity {
@@ -52,6 +60,9 @@ impl InternalEntity {
 			velocity: source.velocity,
 			angular_velocity: source.angular_velocity,
 			colliders: HashSet::new(),
+
+			asleep: false,
+			neighbors: HashSet::new(),
 		})
 	}
 
@@ -72,19 +83,36 @@ impl InternalEntity {
 			colliders: self.colliders.clone(),
 
 			last_prepped_moment_of_inertia: self.prepped_moment_of_inertia.clone(),
+
+			asleep: self.asleep,
 		}
 	}
 
 	/// Updates from the passed in Entity object.
 	pub fn update_from(&mut self, source : Entity) -> Result<(),()> {
 		if 0.0 > source.own_mass { return Err(()); }
+		let new_rotation = Quat::from_scaled_axis(source.rotation);
+		#[allow(unused_parens)]
+		let changed = (
+			self.own_mass != source.own_mass ||
+			self.orientation.position != source.position ||
+			self.orientation.rotation != new_rotation ||
+			self.velocity != source.velocity ||
+			self.angular_velocity != source.angular_velocity
+		);
+
+		if changed {
+			self.asleep = false;
+			self.neighbors.clear();
+		}
+
 		self.own_mass = source.own_mass;
 		self.orientation.position = source.position;
-
-		self.orientation.rotation = Quat::from_scaled_axis(source.rotation);
+		self.orientation.rotation = new_rotation;
 
 		self.velocity = source.velocity;
 		self.angular_velocity = source.angular_velocity;
+
 		Ok(())
 	}
 
@@ -170,15 +198,38 @@ impl InternalEntity {
 	/// Gets the total energy of this object.
 	#[allow(dead_code)]
 	pub fn get_total_energy(&self) -> f32 {
-		let linear_energy = (self.total_mass * self.velocity).dot(&self.velocity) / 2.0;
-		let angular_energy = (self.get_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
-		linear_energy + angular_energy
+		if self.total_mass.is_infinite() {
+			INFINITY
+		} else {
+			let linear_energy = (self.total_mass * self.velocity).dot(&self.velocity) / 2.0;
+			let angular_energy = (self.get_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
+			linear_energy + angular_energy
+		}
 	}
 
-	// Applies an impulse at a (world) position to this instance's linear and angular velocities.
+	/// Applies an impulse at a (world) position to this instance's linear and angular velocities.
 	pub fn apply_impulse(&mut self, position : &Vec3, impulse : &Vec3) {
 		self.velocity += impulse.scale(1.0 / self.get_total_mass());
 		self.angular_velocity += self.get_inverse_moment_of_inertia() * (position - self.orientation.position).cross(&impulse);
+	}
+
+	/// Wakes up this entity and any neighbors it is in contact with (recursively).
+	pub fn wake_up(start : EntityHandle, all_entities : &mut Arena<InternalEntity>, debug : &mut Vec<String>) {
+		let mut completed = HashSet::new();
+		let mut queue = VecDeque::new();
+		queue.push_back(start);
+		while let Some(target_handle) = queue.pop_front() {
+			completed.insert(target_handle);
+			let mut target = all_entities.get_mut(target_handle).unwrap();
+			for neighbor in &target.neighbors {
+				if !completed.contains(neighbor) {
+					queue.push_back(*neighbor);
+				}
+			}
+			if target.asleep { debug.push(format!("Waking up {:?}.", target_handle)); }
+			target.asleep = false;
+			target.neighbors.clear();
+		}
 	}
 }
 
@@ -233,6 +284,13 @@ pub struct Entity {
 	///
 	/// Defaults to a zero matrix.
 	last_prepped_moment_of_inertia : Mat3,
+
+	/// Whether the entity has been put to sleep.
+	///
+	/// When asleep, the entity won't receive physics updates until it (or something it's in contact with) is hit.
+	///
+	/// Defaults to `false`.
+	asleep : bool,
 }
 
 impl Entity {
@@ -253,6 +311,8 @@ impl Entity {
 			),
 			last_total_mass: 0.0,
 			last_prepped_moment_of_inertia: Mat3::zeros(),
+
+			asleep: false,
 		}
 	}
 
@@ -295,5 +355,10 @@ impl Entity {
 		let linear_energy = (self.last_total_mass * self.velocity).dot(&self.velocity) / 2.0;
 		let angular_energy = (self.get_last_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
 		linear_energy + angular_energy
+	}
+
+	/// Checks whether the entity was asleep.
+	pub fn was_asleep(&self) -> bool {
+		self.asleep
 	}
 }

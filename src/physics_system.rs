@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::borrow::BorrowMut;
+use std::collections::HashSet;
 
 use generational_arena::Arena;
 
@@ -29,7 +30,14 @@ pub struct PhysicsSystem {
 	/// The max number of physics iterations allowed per step.
 	///
 	/// For now this limits how many collisions can be handled in a step.
+	///
+	/// Defaults to 5.
 	pub iteration_max : u8,
+
+	/// The minimum amount of energy needed to prevent an entity from being put to sleep.
+	///
+	/// Defaults to 0.001
+	pub energy_sleep_threshold : f32,
 
 	/// A place to store debugging info when things go wrong internally.
 	pub debug : Vec<String>,
@@ -43,6 +51,10 @@ struct EntityStepInfo {
 	linear_movement : Vec3,
 	/// The planned angular motion for the entity.
 	angular_movement : Vec3,
+	/// All of the entities that have been collided with recently.
+	neighbors : HashSet<EntityHandle>,
+	/// The time that the given `neighbors` set was last updated.
+	neighbors_time : f32,
 }
 
 impl PhysicsSystem {
@@ -53,6 +65,7 @@ impl PhysicsSystem {
 			colliders : RefCell::new(Arena::new()),
 			unary_force_generators : RefCell::new(Arena::new()),
 			iteration_max : 5,
+			energy_sleep_threshold : 0.001,
 
 			debug: Vec::new(),
 		}
@@ -318,7 +331,16 @@ impl PhysicsSystem {
 			entity.angular_velocity += entity.get_inverse_moment_of_inertia() * torque.scale(dt);
 			let angular_movement = entity.angular_velocity.scale(dt);
 
-			entity_info.push(EntityStepInfo { handle, linear_movement, angular_movement, });
+			// NOTE: Allowing velocities to be set even on sleeping entities so that if they're woken up during this step(), they will still have the basic velocities setup.
+			// This should help insure that the newly-woken entities have a shot at being awake for a bit before being pushed back to sleep.
+
+			entity_info.push(EntityStepInfo {
+				handle,
+				linear_movement,
+				angular_movement,
+				neighbors: HashSet::new(),
+				neighbors_time: 0.0,
+			});
 		}
 
 		// TODO: Setup a broad-phase that checks AABBs.
@@ -352,7 +374,13 @@ impl PhysicsSystem {
 					let (first_option, second_option) = entities.get2_mut(first_entity_info.handle, second_entity_info.handle);
 					let first = first_option.unwrap();
 					let second = second_option.unwrap();
-					//
+
+					// Ignore the possible collisions if they're a part of the known collisions that were detected when the entity went to sleep.
+					if first.neighbors.contains(&second_entity_info.handle) || second.neighbors.contains(&first_entity_info.handle) {
+						continue;
+					}
+
+					// Then check all colliders between the two entities.
 					for first_collider_handle in first.colliders.iter() {
 						for second_collider_handle in second.colliders.iter() {
 							let colliders = self.colliders.borrow();
@@ -376,7 +404,6 @@ impl PhysicsSystem {
 								second_collider_box,
 								&second_start_orientation,
 								&second_end_orientation,
-								&mut self.debug,
 							);
 
 							if let Some(collision) = collision_option {
@@ -385,11 +412,11 @@ impl PhysicsSystem {
 								let first_full_velocity = first.get_velocity_at_world_position(&collision.position);
 								let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
 								let velocity_delta = first_full_velocity - second_full_velocity;
-
 								if EPSILON > velocity_delta.dot(&collision.normal) {
 									//self.debug.push(format!("Dropping collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?})", collision.position, first_collider_handle, first_full_velocity, second_collider_handle, second_full_velocity));
 									continue;
 								}
+
 								// Otherwise check if this collision is the closest.
 								if time < earliest_collision_percent {
 									earliest_collision_percent = time;
@@ -409,6 +436,30 @@ impl PhysicsSystem {
 				}
 			}
 
+			// Wake up any entities that should be woken up due to the collision.
+			if let Some(entity_handle) = earliest_collision_first_entity_handle.clone() {
+				// Don't try to wake up any entities that have infinite mass.
+				let has_finite_mass = {
+					let entities = self.entities.borrow_mut();
+					let entity = entities.get(entity_handle).unwrap();
+					entity.get_total_mass().is_finite()
+				};
+				if has_finite_mass {
+					InternalEntity::wake_up(entity_handle, &mut self.entities.borrow_mut(), &mut self.debug);
+				}
+			}
+			if let Some(entity_handle) = earliest_collision_second_entity_handle.clone() {
+				// Don't try to wake up any entities that have infinite mass.
+				let has_finite_mass = {
+					let entities = self.entities.borrow_mut();
+					let entity = entities.get(entity_handle).unwrap();
+					entity.get_total_mass().is_finite()
+				};
+				if has_finite_mass {
+					InternalEntity::wake_up(entity_handle, &mut self.entities.borrow_mut(), &mut self.debug);
+				}
+			}
+
 			// Re-adjust all of the movements to account for time stepping forward to just before (time_left * earliest_collision).
 			let mut entities = self.entities.borrow_mut();
 			let after_collision_percent = 1.0 - earliest_collision_percent;
@@ -416,10 +467,13 @@ impl PhysicsSystem {
 			for info in &mut entity_info {
 				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
 				let entity = entities.get_mut(info.handle).unwrap();
-				entity.orientation.affect_with(
-					&(info.linear_movement  * earliest_collision_percent),
-					&(info.angular_movement * earliest_collision_percent),
-				);
+				// Don't bother if the entity is asleep or if the mass is infinite.
+				if !entity.asleep && entity.get_total_mass().is_finite() {
+					entity.orientation.affect_with(
+						&(info.linear_movement  * earliest_collision_percent),
+						&(info.angular_movement * earliest_collision_percent),
+					);
+				}
 				info.linear_movement *= after_collision_percent;
 				info.angular_movement *= after_collision_percent;
 			}
@@ -434,6 +488,26 @@ impl PhysicsSystem {
 				let mut first  = first_option.unwrap();
 				let mut second = second_option.unwrap();
 
+				// Update the neighbors set.
+				const TIME_EPSILON : f32 = 0.01;
+				{
+					let mut info = &mut entity_info[earliest_collision_first_info_index];
+					if TIME_EPSILON < (info.neighbors_time - time_left).abs() {
+						info.neighbors.clear();
+					}
+					info.neighbors_time = time_left;
+					info.neighbors.insert(second_entity_handle);
+				}
+				{
+					let mut info = &mut entity_info[earliest_collision_second_info_index];
+					if TIME_EPSILON < (info.neighbors_time - time_left).abs() {
+						info.neighbors.clear();
+					}
+					info.neighbors_time = time_left;
+					info.neighbors.insert(first_entity_handle);
+				}
+
+				// Then calculate the impulse.
 				let impulse = PhysicsSystem::calc_collision_impulse(
 					&first,
 					&second,
@@ -496,7 +570,7 @@ impl PhysicsSystem {
 					);
 				}
 
-				//self.debug.push(format!("After friction: {:?} {:?}", first.velocity, second.velocity));
+				//self.debug.push(format!("After friction energies: {:?} {:?}", first.get_total_energy(), second.get_total_energy()));
 			} else {
 				//self.debug.push(format!("Collisions handled after {} iterations.", iteration+1));
 				concluded = true;
@@ -505,6 +579,28 @@ impl PhysicsSystem {
 		}
 		if !concluded {
 			self.debug.push(format!("Ran out of iterations!"));
+		}
+
+		// Put any entities to sleep if they have too little energy left.
+		for info in &mut entity_info {
+			let mut entities = self.entities.borrow_mut();
+			let entity = entities.get_mut(info.handle).unwrap();
+			// Ignore entities that are alreaedy asleep.
+			if entity.asleep {
+				// Clear out any accumulated velocity.
+				entity.velocity = Vec3::zeros();
+				entity.angular_velocity = Vec3::zeros();
+				continue;
+			}
+			// Don't bother with putting infinite mass entities to sleep (they already function like that).
+			if !entity.get_total_mass().is_finite() { continue; }
+			// Then check if the energy left is small enough to put it to sleep.
+			let energy = entity.get_total_energy();
+			if energy < self.energy_sleep_threshold {
+				entity.asleep = true;
+				entity.neighbors = info.neighbors.clone();
+				self.debug.push(format!("Putting {:?} to sleep (energy={:?}; neighbors={:?}; velocity={:?}; angular_velocity={:?})", info.handle, energy, info.neighbors.len(), entity.velocity, entity.angular_velocity));
+			}
 		}
 	}
 
@@ -980,7 +1076,8 @@ mod tests {
 			system.add_entity(entity).unwrap()
 		};
 		let collider = {
-			let sphere = SphereCollider::new(1.0);
+			let mut sphere = SphereCollider::new(1.0);
+			sphere.mass = 1.0;
 			system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
 		};
 		system.link_collider(collider, Some(first)).unwrap();
@@ -1020,6 +1117,8 @@ mod tests {
 			let collider = {
 				let mut sphere = SphereCollider::new(1.0);
 				sphere.mass = 1.0;
+				sphere.static_friction_coefficient = 0.0;
+				sphere.dynamic_friction_coefficient = 0.0;
 				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
 			};
 			system.link_collider(collider, Some(first)).unwrap();
@@ -1039,6 +1138,8 @@ mod tests {
 				let mut sphere = SphereCollider::new(1.0);
 				sphere.center = Vec3::new(-2.0, 0.0, 0.0);
 				sphere.mass = 1.0;
+				sphere.static_friction_coefficient = 0.0;
+				sphere.dynamic_friction_coefficient = 0.0;
 				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
 			};
 			system.link_collider(left, Some(dual)).unwrap();
@@ -1046,6 +1147,8 @@ mod tests {
 				let mut sphere = SphereCollider::new(1.0);
 				sphere.center = Vec3::new(2.0, 0.0, 0.0);
 				sphere.mass = 1.0;
+				sphere.static_friction_coefficient = 0.0;
+				sphere.dynamic_friction_coefficient = 0.0;
 				system.add_collider(ColliderWrapper::Sphere(sphere)).unwrap()
 			};
 			system.link_collider(right, Some(dual)).unwrap();
@@ -1141,6 +1244,8 @@ mod tests {
 			let mut plane = PlaneCollider::new();
 			plane.normal = Vec3::z();
 			plane.mass = INFINITY;
+			plane.static_friction_coefficient = 0.0;
+			plane.dynamic_friction_coefficient = 0.0;
 			let plane_handle = system.add_collider(ColliderWrapper::Plane(plane)).unwrap();
 			system.link_collider(plane_handle, Some(entity_handle)).unwrap();
 			println!("wall: {:?}", plane_handle);
