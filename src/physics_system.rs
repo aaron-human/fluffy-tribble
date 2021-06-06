@@ -376,6 +376,7 @@ impl PhysicsSystem {
 								second_collider_box,
 								&second_start_orientation,
 								&second_end_orientation,
+								&mut self.debug,
 							);
 
 							if let Some(collision) = collision_option {
@@ -440,6 +441,8 @@ impl PhysicsSystem {
 					&collision,
 				);
 
+				//self.debug.push(format!("Before collision at {:?}: {:?} {:?}", collision.position, first.velocity, second.velocity));
+
 				PhysicsSystem::apply_collision_impulse(
 					&mut first,
 					&mut entity_info[earliest_collision_first_info_index],
@@ -454,6 +457,8 @@ impl PhysicsSystem {
 					&-impulse,
 					time_after_collision,
 				);
+
+				//self.debug.push(format!("After collision at {:?}: {:?} {:?}", collision.position, first.velocity, second.velocity));
 
 				{// Then figure out friction.
 					let first_velocity  = first.get_velocity_at_world_position(&collision.position);
@@ -490,6 +495,8 @@ impl PhysicsSystem {
 						time_after_collision,
 					);
 				}
+
+				//self.debug.push(format!("After friction: {:?} {:?}", first.velocity, second.velocity));
 			} else {
 				//self.debug.push(format!("Collisions handled after {} iterations.", iteration+1));
 				concluded = true;

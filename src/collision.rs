@@ -25,7 +25,7 @@ impl Collision {
 }
 
 /// Tries to collide any two arbitrary colliders.
-pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, end1 : &Orientation, collider2 : &Box<dyn InternalCollider>, start2 : &Orientation, end2 : &Orientation) -> Option<Collision> {
+pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, end1 : &Orientation, collider2 : &Box<dyn InternalCollider>, start2 : &Orientation, end2 : &Orientation, debug : &mut Vec<String>) -> Option<Collision> {
 	// Always ignore a NullCollider.
 	// This is redundant now, but won't be in the future.
 	if ColliderType::NULL == collider1.get_type() || ColliderType::NULL == collider2.get_type() {
@@ -156,6 +156,7 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 			&plane_start_position,
 			&plane_end_position,
 			&plane.normal,
+			debug,
 		);
 	}
 
@@ -175,6 +176,7 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 			&plane_start_position,
 			&plane_end_position,
 			&plane.normal,
+			debug,
 		);
 		// Must negate the normal as the mesh is the second collider.
 		if let Some(mut collision) = collision_option {
@@ -406,12 +408,20 @@ pub fn collide_sphere_with_mesh(radius1 : f32, center1: &Vec3, movement1 : &Vec3
 	accumulator.get()
 }
 
+struct _MeshCollisionInfo {
+	start_position : Vec3,
+	end_position : Vec3,
+
+	start_distance : f32,
+	end_distance : f32,
+}
+
 /// Collides a mesh with an (infinite) plane.
-pub fn collide_mesh_with_plane(mesh_vertices : &Vec<Vec3>, mesh_position : &Vec3, mesh_start_orientation : &Orientation, mesh_end_orientation : &Orientation, plane_start_position : &Vec3, plane_end_position : &Vec3, plane_normal : &Vec3) -> Option<Collision> {
+pub fn collide_mesh_with_plane(mesh_vertices : &Vec<Vec3>, mesh_position : &Vec3, mesh_start_orientation : &Orientation, mesh_end_orientation : &Orientation, plane_start_position : &Vec3, plane_end_position : &Vec3, plane_normal : &Vec3, debug : &mut Vec<String>) -> Option<Collision> {
 	let mut start_distances = Range::empty();
 	let mut end_distances = Range::empty();
-	let mut closest_start_position = Vec3::zeros();
-	let mut closest_end_position = Vec3::zeros();
+	let mut calculated  = Vec::new();
+	let mut debugs = Vec::new();
 	for vertex in mesh_vertices {
 		let internal_vertex_position = mesh_position + vertex;
 		let mesh_start_position = mesh_start_orientation.position_into_world(&internal_vertex_position);
@@ -420,15 +430,17 @@ pub fn collide_mesh_with_plane(mesh_vertices : &Vec<Vec3>, mesh_position : &Vec3
 		let start_distance = (mesh_start_position - plane_start_position).dot(plane_normal);
 		let end_distance   = (mesh_end_position   - plane_end_position).dot(plane_normal);
 
+		debugs.push(format!("point {:?} => {:?} {:?}", vertex, start_distance, end_distance));
+
 		start_distances = start_distances.contain(&Range::single(start_distance));
 		end_distances   = end_distances.contain(&Range::single(end_distance));
 
-		if start_distances.min() == start_distance {
-			closest_start_position = mesh_start_position;
-		}
-		if end_distances.min() == end_distance {
-			closest_end_position = mesh_end_position;
-		}
+		calculated.push(_MeshCollisionInfo {
+			start_position: mesh_start_position,
+			end_position: mesh_end_position,
+
+			start_distance, end_distance,
+		});
 	}
 
 	let times = Range::range(-INFINITY, 0.0).linear_overlap(
@@ -437,10 +449,29 @@ pub fn collide_mesh_with_plane(mesh_vertices : &Vec<Vec3>, mesh_position : &Vec3
 	).intersect(&Range::range(0.0, 1.0));
 
 	if !times.is_empty() {
+		let mut closest_start_position_sum = Vec3::zeros();
+		let mut closest_start_position_count : f32 = 0.0;
+		let mut closest_end_position_sum = Vec3::zeros();
+		let mut closest_end_position_count : f32 = 0.0;
+		let start_epsilon = start_distances.size() * 0.01;// Apparently the standard EPSILON is a bit too small...
+		let end_epsilon = end_distances.size() * 0.01;// Apparently the standard EPSILON is a bit too small...
+		for info in calculated {
+			if start_epsilon > (info.start_distance - start_distances.min()).abs() {
+				closest_start_position_sum += info.start_position;
+				closest_start_position_count += 1.0;
+			}
+			if end_epsilon > (info.end_distance - end_distances.min()).abs() {
+				closest_end_position_sum += info.end_position;
+				closest_end_position_count += 1.0;
+			}
+		}
+		closest_start_position_sum /= closest_start_position_count;
+		closest_end_position_sum /= closest_end_position_count;
+
 		let time = times.min();
 		Some(Collision {
 			times: times,
-			position: closest_start_position * (1.0 - time) + closest_end_position * time,
+			position: closest_start_position_sum * (1.0 - time) + closest_end_position_sum * time,
 			normal: -plane_normal,
 		})
 	} else {

@@ -1,0 +1,11 @@
+Isolate entities so that one can't bug out and cause all of them to lose all collision. This is probably the time step value occasionally becomeing non-finite.
+
+Also isolate entities so that one entity can't freeze up the entire simulation if it takes a lot of computation. Maybe have it "give up" on that entity or collision pair if it takes too many? (And then move on to all the other entities/pairings.)
+
+Add a rectangle collider.
+
+Add some sort of "rolling friction" drag?
+
+More efficient collision detection.
+
+Colliders that have no collision, they just add mass to an entity at a position?
