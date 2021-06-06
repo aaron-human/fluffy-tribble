@@ -1,6 +1,10 @@
-Isolate entities so that one can't bug out and cause all of them to lose all collision. This is probably the time step value occasionally becomeing non-finite.
+Add a collider for mesh-to-mesh collision.
+
+Make the collision handling "aggregate" multiple collisions between two entities if they happen near the same time. Though this might explode things if the collisions get too compliated?
 
 Also isolate entities so that one entity can't freeze up the entire simulation if it takes a lot of computation. Maybe have it "give up" on that entity or collision pair if it takes too many? (And then move on to all the other entities/pairings.)
+
+Isolate entities so that one can't bug out and cause all of them to lose all collision. This is probably the time step value occasionally becomeing non-finite.
 
 Add a rectangle collider.
 

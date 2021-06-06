@@ -468,7 +468,7 @@ impl PhysicsSystem {
 				// Always advance the actual entity forward by time (to keep all the movement values in lock-step).
 				let entity = entities.get_mut(info.handle).unwrap();
 				// Don't bother if the entity is asleep or if the mass is infinite.
-				if !entity.asleep && entity.get_total_mass().is_finite() {
+				if !entity.asleep {
 					entity.orientation.affect_with(
 						&(info.linear_movement  * earliest_collision_percent),
 						&(info.angular_movement * earliest_collision_percent),
@@ -592,8 +592,6 @@ impl PhysicsSystem {
 				entity.angular_velocity = Vec3::zeros();
 				continue;
 			}
-			// Don't bother with putting infinite mass entities to sleep (they already function like that).
-			if !entity.get_total_mass().is_finite() { continue; }
 			// Then check if the energy left is small enough to put it to sleep.
 			let energy = entity.get_total_energy();
 			if energy < self.energy_sleep_threshold {
