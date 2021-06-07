@@ -474,6 +474,107 @@ pub fn collide_mesh_with_plane(mesh_vertices : &Vec<Vec3>, mesh_position : &Vec3
 	}
 }
 
+fn get_polygon_normal(points : &Vec<Vec3>) -> Vec3 {
+	for index in 0..points.len() {
+		let mut next_index = index + 1;
+		if next_index >= points.len() { next_index -= points.len(); }
+		let prev_index = if 0 < index { index - 1 } else { points.len()-1 };
+		let normal = (points[prev_index] - points[index]).cross(&(points[next_index] - points[index]));
+		let length = normal.magnitude();
+		if length.is_finite() && EPSILON < length {
+			return normal / length;
+		}
+	}
+	panic!("Couldn't find a normal for the polygon: {:?}", points);
+}
+
+fn point_is_on_plane(point : &Vec3, plane_normal : &Vec3, plane_point : &Vec3) -> bool {
+	(point - plane_point).dot(plane_normal).abs() < EPSILON
+}
+
+/// Collides a single moving point with a polygon (that's confined to a plane).
+///
+/// **WARNING:** This is not really meant to be used on its own. This is intended to be used in the mesh-to-mesh collision checking.
+fn collide_point_with_polygon(point_start : &Vec3, point_end : &Vec3, polygon : &Vec<Vec3>) -> Option<Collision> {
+	let point_delta = point_end - point_start;
+	// First: figure out when the point will collide with the (moving) plane.
+	// Then decide whether that point (or point movement) goes into the polygon.
+	let plane_normal = get_polygon_normal(polygon);
+	// Note that the only way for the point to be on the plane more than once is if it's always on the plane. So use that to decide...
+	if point_is_on_plane(point_start, &plane_normal, &polygon[0]) && point_is_on_plane(point_end, &plane_normal, &polygon[0]) {
+		// Then see if/when that point intersects with the polygon's line segments.
+		let mut closest_time = 2.0;
+		let mut closest_position = Vec3::zeros();
+		for index in 0..polygon.len() {
+			let mut next_index = index + 1;
+			if next_index >= polygon.len() { next_index -= polygon.len(); }
+			//
+			let direction = polygon[next_index] - polygon[index];
+			let line_ortho = plane_normal.cross(&direction).normalize();
+			let ortho_distance_start = (point_start - polygon[index]).dot(&line_ortho);
+			let ortho_distance_delta = (point_end - polygon[index]).dot(&line_ortho) - ortho_distance_start;
+			let time = ortho_distance_start / -ortho_distance_delta;
+			if !time.is_finite() || 0.0 > time || 1.0 < time { // Out of bounds time means no collision.
+				continue;
+			}
+			let position = point_start + point_delta * time;
+			let along = (position - polygon[index]).dot(&direction);
+			if 0.0 > along || along > direction.dot(&direction) { // Ignore points that are beyond the end points.
+				continue;
+			}
+			if time < closest_time {
+				closest_time = time;
+				closest_position = position;
+			}
+		}
+		if closest_time <= 1.0 {
+			Some(Collision {
+				times: Range::single(closest_time),
+				position: closest_position,
+				normal: plane_normal,
+			})
+		} else {
+			None
+		}
+	} else {
+		// Then it can only be on the plane at one instant.
+		let time = (point_start - polygon[0]).dot(&plane_normal) / -point_delta.dot(&plane_normal);
+		if !time.is_finite() || 0.0 > time || 1.0 < time { // No point-plane collision means no collision at all.
+			return None;
+		}
+		let point = point_start + point_delta * time;
+		// Then check if that point is inside of the polygon using cross product.
+		let mut is_inside = true;
+		let mut expected_sign = 0.0;
+		for index in 0..polygon.len() {
+			let mut next_index = index + 1;
+			if next_index >= polygon.len() { next_index -= polygon.len(); }
+			let distance = point - polygon[index];
+			if distance.magnitude() < EPSILON {
+				break;
+			}
+			let cross = (polygon[next_index] - polygon[index]).cross(&distance).dot(&plane_normal);
+			if cross.abs() < EPSILON { continue; }
+			let sign = cross.signum();
+			if 0.0 != expected_sign && expected_sign != sign {
+				is_inside = false;
+				break;
+			}
+			expected_sign = sign;
+		}
+
+		if is_inside {
+			Some(Collision {
+				times: Range::single(time),
+				position: point,
+				normal: plane_normal,
+			})
+		} else {
+			None
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::consts::EPSILON;
@@ -759,6 +860,57 @@ mod tests {
 			assert!((hit.times.min() - 0.0).abs() < EPSILON);
 			assert!((hit.position - Vec3::new(1.0, 1.0, 1.0)).magnitude() < EPSILON);
 			assert!((hit.normal - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
+		}
+	}
+
+	#[test]
+	fn check_collide_point_with_polygon() {
+		let polygon = vec![
+			Vec3::new(0.0, 0.0, 0.0),
+			Vec3::new(2.0, 0.0, 0.0),
+			Vec3::new(0.0, 2.0, 0.0),
+		];
+		{ // A clean miss (just one point that's in the polygon).
+			let hit = collide_point_with_polygon(
+				&Vec3::new(0.0, 5.0, 1.0),
+				&Vec3::new(0.0, 5.0,-1.0),
+				&polygon,
+			);
+			assert!(hit.is_none());
+		}
+		{ // A clean hit (just one point that's in the polygon).
+			let hit = collide_point_with_polygon(
+				&Vec3::new(0.5, 0.5, 1.0),
+				&Vec3::new(0.5, 0.5,-1.0),
+				&polygon,
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(0.5, 0.5, 0.0)).magnitude() < EPSILON);
+		}
+		{ // Along the polygon plane, but no hit.
+			let hit = collide_point_with_polygon(
+				&Vec3::new(1.0,-1.0, 0.0),
+				&Vec3::new(1.0,-2.0, 0.0),
+				&polygon,
+			);
+			assert!(hit.is_none());
+		}
+		{ // Along the polygon plane, but no hit (this makes sure that the line segments aren't treated as infinite lines).
+			let hit = collide_point_with_polygon(
+				&Vec3::new(10.0,-1.0, 0.0),
+				&Vec3::new(10.0, 1.0, 0.0),
+				&polygon,
+			);
+			assert!(hit.is_none());
+		}
+		{ // Along the polygon plane into a hit.
+			let hit = collide_point_with_polygon(
+				&Vec3::new(1.0,-1.0, 0.0),
+				&Vec3::new(1.0, 1.0, 0.0),
+				&polygon,
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(1.0, 0.0, 0.0)).magnitude() < EPSILON);
 		}
 	}
 }
