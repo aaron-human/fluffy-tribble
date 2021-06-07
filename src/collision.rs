@@ -185,6 +185,20 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 		}
 	}
 
+	if ColliderType::MESH == collider1.get_type() && ColliderType::MESH == collider2.get_type() {
+		let mesh1  = collider1.downcast_ref::<InternalMeshCollider>().unwrap();
+		let mesh2  = collider2.downcast_ref::<InternalMeshCollider>().unwrap();
+
+		return collide_mesh_with_mesh(
+			&mesh1,
+			start1,
+			end1,
+			&mesh2,
+			start2,
+			end2,
+		);
+	}
+
 	None
 }
 
@@ -499,7 +513,7 @@ fn collide_point_with_polygon(point_start : &Vec3, point_end : &Vec3, polygon : 
 	let point_delta = point_end - point_start;
 	// First: figure out when the point will collide with the (moving) plane.
 	// Then decide whether that point (or point movement) goes into the polygon.
-	let plane_normal = get_polygon_normal(polygon);
+	let mut plane_normal = get_polygon_normal(polygon);
 	// Note that the only way for the point to be on the plane more than once is if it's always on the plane. So use that to decide...
 	if point_is_on_plane(point_start, &plane_normal, &polygon[0]) && point_is_on_plane(point_end, &plane_normal, &polygon[0]) {
 		// Then see if/when that point intersects with the polygon's line segments.
@@ -543,6 +557,18 @@ fn collide_point_with_polygon(point_start : &Vec3, point_end : &Vec3, polygon : 
 			return None;
 		}
 		let point = point_start + point_delta * time;
+		{ // Make sure the normal points toward the starting point.
+			let start_coincidence = (point_start - polygon[0]).dot(&plane_normal);
+			if -EPSILON > start_coincidence {
+				plane_normal *= -1.0;
+			} else if EPSILON > start_coincidence {
+				let end_coincidence = (point_end - polygon[0]).dot(&plane_normal);
+				if 0.0 < end_coincidence {
+					plane_normal *= -1.0;
+				}
+				// NOTE: If both are basically zero, then I have no idea what sort of normal should be used here.
+			}
+		}
 		// Then check if that point is inside of the polygon using cross product.
 		let mut is_inside = true;
 		let mut expected_sign = 0.0;
@@ -573,6 +599,86 @@ fn collide_point_with_polygon(point_start : &Vec3, point_end : &Vec3, polygon : 
 			None
 		}
 	}
+}
+
+struct MeshPointPairs {
+	start : Vec3,
+	end : Vec3,
+}
+
+fn precompute_mesh_point_pairs(mesh : &InternalMeshCollider, start_orientation : &Orientation, end_orientation : &Orientation) -> Vec<MeshPointPairs> {
+	let mut transformed = Vec::with_capacity(mesh.vertices.len());
+	for point in &mesh.vertices {
+		let internal_position = mesh.position + point;
+		transformed.push(MeshPointPairs {
+			start: start_orientation.position_into_world(&internal_position),
+			end: end_orientation.position_into_world(&internal_position),
+		});
+	}
+	transformed
+}
+
+fn collide_mesh_points_with_mesh_faces(output : &mut EarliestCollisionAccumulator, mesh1_points : &Vec<MeshPointPairs>, mesh2 : &InternalMeshCollider, mesh2_points : &Vec<MeshPointPairs>, normal_factor : f32) {
+	let mut face_points = Vec::new();
+	let mut accumulator = EarliestCollisionAccumulator::new();
+	for points_info in mesh1_points {
+		for face in &mesh2.faces {
+			face_points.clear();
+			for index in face {
+				face_points.push((mesh2_points[*index].start + mesh2_points[*index].end) / 2.0);
+			}
+			accumulator.consider(collide_point_with_polygon(
+				&points_info.start,
+				&points_info.end,
+				&face_points,
+			));
+		}
+	}
+
+	if let Some(mut collision) = accumulator.get() {
+		// Make sure the normal is pointing at most of the points.
+		// Do this once at the end because it's kinda expensive.
+		let mut negate : usize = 0;
+		let mut keep : usize = 0;
+		for points_info in mesh1_points {
+			let time = collision.times.min();
+			let point = points_info.start * (1.0 - time) + points_info.end * time;
+			let sign = (point - collision.position).dot(&collision.normal);
+			if 0.0 > sign {
+				negate += 1;
+			} else {
+				keep += 1;
+			}
+		}
+		if negate > keep {
+			collision.normal *= -1.0;
+		}
+		collision.normal *= normal_factor;
+		output.consider(Some(collision));
+	}
+}
+
+pub fn collide_mesh_with_mesh(mesh1 : &InternalMeshCollider, mesh1_start_orientation : &Orientation, mesh1_end_orientation : &Orientation, mesh2 : &InternalMeshCollider, mesh2_start_orientation : &Orientation, mesh2_end_orientation : &Orientation) -> Option<Collision> {
+	let mut accumulator = EarliestCollisionAccumulator::new();
+	let mesh1_points = precompute_mesh_point_pairs(mesh1, mesh1_start_orientation, mesh1_end_orientation);
+	let mesh2_points = precompute_mesh_point_pairs(mesh2, mesh2_start_orientation, mesh2_end_orientation);
+	// First check all the corners.
+	collide_mesh_points_with_mesh_faces(
+		&mut accumulator,
+		&mesh1_points,
+		&mesh2,
+		&mesh2_points,
+		-1.0,
+	);
+	collide_mesh_points_with_mesh_faces(
+		&mut accumulator,
+		&mesh2_points,
+		&mesh1,
+		&mesh1_points,
+		1.0,
+	);
+	// Then check if there are any edge-edge intersections. (TODO!)
+	accumulator.get()
 }
 
 #[cfg(test)]
@@ -886,6 +992,33 @@ mod tests {
 			).unwrap();
 			assert!((hit.times.min() - 0.5).abs() < EPSILON);
 			assert!((hit.position - Vec3::new(0.5, 0.5, 0.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
+		}
+		{ // A clean hit (just one point that's in the polygon). But now flip the normal.
+			let hit = collide_point_with_polygon(
+				&Vec3::new(0.5, 0.5,-1.0),
+				&Vec3::new(0.5, 0.5, 1.0),
+				&polygon,
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(0.5, 0.5, 0.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(0.0, 0.0,-1.0)).magnitude() < EPSILON);
+		}
+		{ // Verify that if the start point is on the polygon, the normal will be based on the end.
+			let hit = collide_point_with_polygon(
+				&Vec3::new(0.5, 0.5, 0.0),
+				&Vec3::new(0.5, 0.5, 1.0),
+				&polygon,
+			).unwrap();
+			assert!((hit.normal - Vec3::new(0.0, 0.0,-1.0)).magnitude() < EPSILON);
+		}
+		{ // Verify that if the start point is on the polygon, the normal will be based on the end. (part 2)
+			let hit = collide_point_with_polygon(
+				&Vec3::new(0.5, 0.5, 0.0),
+				&Vec3::new(0.5, 0.5,-1.0),
+				&polygon,
+			).unwrap();
+			assert!((hit.normal - Vec3::new(0.0, 0.0, 1.0)).magnitude() < EPSILON);
 		}
 		{ // Along the polygon plane, but no hit.
 			let hit = collide_point_with_polygon(
