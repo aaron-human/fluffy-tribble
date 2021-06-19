@@ -413,7 +413,7 @@ impl PhysicsSystem {
 								let second_full_velocity = second.get_velocity_at_world_position(&collision.position);
 								let velocity_delta = first_full_velocity - second_full_velocity;
 								if EPSILON > velocity_delta.dot(&collision.normal) {
-									self.debug.push(format!("Dropping collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?}) normal={:?}", collision.position, first_collider_handle, first_full_velocity, second_collider_handle, second_full_velocity, collision.normal));
+									//self.debug.push(format!("Dropping collision at: {:?} between {:?} (velocity: {:?}) and {:?} (velocity: {:?}) normal={:?}", collision.position, first_collider_handle, first_full_velocity, second_collider_handle, second_full_velocity, collision.normal));
 									continue;
 								}
 

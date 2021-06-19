@@ -314,6 +314,19 @@ Pitfalls:
 * Can only use the "parallel axis" equations ONCE when shifting away. To use them, the original tensor MUST be centered about the center-of-mass.
 * There's a weird feed-back between storing the object's position as the center of mass and recalculating the center of mass?
 
-## 4. Then Friction?
+## 4. Friction and Objects At Rest
 
 TODO!
+
+Friction is something that traditionally doesn't work too well in impulse-based physics engines as it's most naturally modeled as a resistance that's integrated over time (rather than applied at a single moment). It also requires setting up a way to differentiate between objects that come into contact and ricochet (friction has negligible impact here) vs those that come into contact and "rest" against each other (which leads to friction having maximal impact).
+
+The approach I've used roughly approximates both of the above using the "Coulomb friction-cone model":
+
+* If the velocity orthogonal to the collision normal is much larger than the velocity along the normal, then a small dynamic friction coefficient is used.  This is mainly to simulate a tiny momentary collision, that would, correspondingly, only cause a tiny amount of friction to be applied.
+* In the opposite scenario, the much larger static friction coefficient is used.  This allows things that are rolling or skidding across a surface to generate amounts of angular momentum proportional to the impulse exerted along the collision normal.
+
+**TODO:** Double check the below... and the above.  Possibly energy is conserved due to how the impulses are applied proportionally to inertia and in opposite directions.  The bit that caused me to setup static vs dynamic coefficients could also have been due to a bug (where I made the angular momentum way too small for non-spheres)?
+
+A word of caution about the above formulation: it is very much an approximation.  As mentioned, the most accurate way to handle friction would be to track and integrate forces and carefully make sure they don't add energy to the system.  But since I'm trying to keep this simple (and hopefully fast), I'm avoiding anything that would require multivariable calculus.  I bring this up to highlight that **the above strategy does not automatically prevent energy from being generated**.  If a collision was perfectly elastic, then any angular velocity that the above adds 
+
+TODO: Putting objects to sleep so that they don't slowly sink into eachother due to gravity.

@@ -11,3 +11,9 @@ Also Wikipedia's articles on angular inertia/momentum/torque/etc, though those a
 # Tools #
 
 I used this to render all the LaTeX: http://www.sciweavers.org/free-online-latex-equation-editor
+
+# More ideas: #
+
+* https://www10.cs.fau.de/publications/theses/2010/Schornbaum_DA_2010.pdf
+* https://graphics.stanford.edu/courses/cs468-03-winter/Papers/ibds.pdf
+* https://people.eecs.berkeley.edu/~jfc/papers/95/ibsrb95.pdf
