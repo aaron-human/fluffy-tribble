@@ -7,7 +7,7 @@
 ///!
 
 mod consts;
-mod types;
+pub mod types;
 pub use types::{EntityHandle, ColliderHandle, UnaryForceGeneratorHandle};
 mod range;
 

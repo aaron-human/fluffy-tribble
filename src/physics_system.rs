@@ -310,14 +310,15 @@ impl PhysicsSystem {
 
 			{
 				let entity_copy = self.get_entity(handle).unwrap();
-				// Since 0.0 * INFINITY becomes NaN, best to NOT integrate acceleration and torque on infinite masses.
-				if entity_copy.get_last_total_mass().is_finite() {
+				// Since 0.0 * INFINITY becomes NaN, best to NOT integrate acceleration and torque on infinite or zero masses.
+				let total_mass = entity_copy.get_last_total_mass();
+				if total_mass.is_finite() && EPSILON < total_mass {
 					for generator_handle in &unary_force_generator_handles {
 						let mut generators_borrow = self.unary_force_generators.borrow_mut();
 						let generator_borrow = generators_borrow.get_mut(*generator_handle).unwrap();
 						let force = generator_borrow.make_force(dt, &self, handle);
 
-						acceleration += force.force.scale(1.0 / entity_copy.get_last_total_mass());
+						acceleration += force.force.scale(1.0 / total_mass);
 						torque += entity_copy.get_last_moment_of_inertia() * (force.position - entity_copy.position).cross(&force.force);
 					}
 				}
