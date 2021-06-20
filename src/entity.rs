@@ -89,22 +89,23 @@ impl InternalEntity {
 	}
 
 	/// Updates from the passed in Entity object.
-	pub fn update_from(&mut self, source : Entity) -> Result<(),()> {
+	pub fn update_from(&mut self, source : Entity) -> Result<bool,()> {
 		if 0.0 > source.own_mass { return Err(()); }
 		let new_rotation = Quat::from_scaled_axis(source.rotation);
+		let rotation_delta = (
+			(new_rotation.w - self.orientation.rotation.w) * (new_rotation.w - self.orientation.rotation.w) +
+			(new_rotation.i - self.orientation.rotation.i) * (new_rotation.i - self.orientation.rotation.i) +
+			(new_rotation.j - self.orientation.rotation.j) * (new_rotation.j - self.orientation.rotation.j) +
+			(new_rotation.k - self.orientation.rotation.k) * (new_rotation.k - self.orientation.rotation.k)
+		).sqrt();
 		#[allow(unused_parens)]
 		let changed = (
 			self.own_mass != source.own_mass ||
-			self.orientation.position != source.position ||
-			self.orientation.rotation != new_rotation ||
-			self.velocity != source.velocity ||
-			self.angular_velocity != source.angular_velocity
+			EPSILON < (self.orientation.position - source.position).magnitude() ||
+			EPSILON < rotation_delta ||
+			EPSILON < (self.velocity - source.velocity).magnitude() ||
+			EPSILON < (self.angular_velocity - source.angular_velocity).magnitude()
 		);
-
-		if changed {
-			self.asleep = false;
-			self.neighbors.clear();
-		}
 
 		self.own_mass = source.own_mass;
 		self.orientation.position = source.position;
@@ -113,7 +114,7 @@ impl InternalEntity {
 		self.velocity = source.velocity;
 		self.angular_velocity = source.angular_velocity;
 
-		Ok(())
+		Ok(changed)
 	}
 
 	/// Recalculates the (cached) mass and inertia values.
@@ -196,10 +197,13 @@ impl InternalEntity {
 	}
 
 	/// Gets the total energy of this object.
-	#[allow(dead_code)]
 	pub fn get_total_energy(&self) -> f32 {
 		if self.total_mass.is_infinite() {
-			INFINITY
+			if self.velocity.magnitude() < EPSILON && self.angular_velocity.magnitude() < EPSILON {
+				0.0
+			} else {
+				INFINITY
+			}
 		} else {
 			let linear_energy = (self.total_mass * self.velocity).dot(&self.velocity) / 2.0;
 			let angular_energy = (self.get_moment_of_inertia() * self.angular_velocity).dot(&self.angular_velocity) / 2.0;
@@ -220,15 +224,33 @@ impl InternalEntity {
 		queue.push_back(start);
 		while let Some(target_handle) = queue.pop_front() {
 			completed.insert(target_handle);
-			let mut target = all_entities.get_mut(target_handle).unwrap();
-			for neighbor in &target.neighbors {
-				if !completed.contains(neighbor) {
-					queue.push_back(*neighbor);
+			let target_neighbors = all_entities.get_mut(target_handle).unwrap().neighbors.clone();
+			for neighbor_handle in target_neighbors {
+				if completed.contains(&neighbor_handle) { continue; }
+				let neighbor = all_entities.get_mut(neighbor_handle).unwrap();
+				if neighbor.total_mass.is_infinite() {
+					// Remove self from neighbor's neighbor set.
+					// Must do this as infinite-mass neighbors can't be woken up when collided with.
+					// But having something in the "neighbor" set means it won't be checked for collision (which is bad as the target just woke up and may need to hit/bounce off of the infinite-mass entity).
+					neighbor.neighbors.remove(&target_handle);
+					println!("Removed {:?} from neighbor set of {:?}.", target_handle, neighbor_handle);
+					debug.push(format!("Removed {:?} from neighbor set of {:?}.", target_handle, neighbor_handle));
+					// Also don't bother trying to wake it up.
+					continue;
 				}
+
+				queue.push_back(neighbor_handle);
 			}
-			if target.asleep { debug.push(format!("Waking up {:?}.", target_handle)); }
-			target.asleep = false;
-			target.neighbors.clear();
+
+			{ // Then wake up the target.
+				let target = all_entities.get_mut(target_handle).unwrap();
+				if target.asleep {
+					println!("Waking up {:?}.", target_handle);
+					debug.push(format!("Waking up {:?}.", target_handle));
+				}
+				target.asleep = false;
+				target.neighbors.clear();
+			}
 		}
 	}
 }
