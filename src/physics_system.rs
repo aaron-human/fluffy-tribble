@@ -38,6 +38,10 @@ pub struct PhysicsSystem {
 	///
 	/// Defaults to 0.001
 	pub energy_sleep_threshold : f32,
+	/// The minimum amount of time that an entity needs to be below the energy threshold to be put to sleep.
+	///
+	/// Defaults to 0.1.
+	pub sleep_time_threshold : f32,
 
 	/// A place to store debugging info when things go wrong internally.
 	pub debug : Vec<String>,
@@ -64,6 +68,7 @@ impl PhysicsSystem {
 			unary_force_generators : RefCell::new(Arena::new()),
 			iteration_max : 5,
 			energy_sleep_threshold : 0.001,
+			sleep_time_threshold: 0.1,
 
 			debug: Vec::new(),
 		}
@@ -603,6 +608,20 @@ impl PhysicsSystem {
 				let energy = entity.get_total_energy(); // TODO: Allow a way to calculate the energy relative to a reference frame. I.e. what if a box was "at rest" on the back of a car moving at a constant speed?
 				if energy > self.energy_sleep_threshold {
 					println!("Energy for {:?} is too high: {:?} > {:?} (velocity={:?}; angular_velocity={:?})", info.handle, energy, self.energy_sleep_threshold, entity.velocity, entity.angular_velocity);
+					// Make sure it's not considering falling asleep.
+					entity.falling_asleep = false;
+					entity.falling_asleep_time = 0.0;
+					// Not falling asleep -> skip the rest of the loop iteration (it assumes things are going to sleep).
+					continue;
+				}
+
+				if entity.falling_asleep {
+					entity.falling_asleep_time += dt; // TODO: Could make this more precise and store time since started during this step() call...
+					println!("For {:?}: Adding {:?} to get {:?}", info.handle, dt, entity.falling_asleep_time);
+				}
+				entity.falling_asleep = true;
+				if self.sleep_time_threshold > entity.falling_asleep_time {
+					println!("Entity {:?} is falling asleep. (Taken {:?} of {:?} seconds so far.)", info.handle, entity.falling_asleep_time, self.sleep_time_threshold);
 					continue;
 				}
 
@@ -1340,8 +1359,8 @@ mod tests {
 
 		system.add_unary_force_generator(Box::new(GravityGenerator::new(Vec3::new(0.0, -1.0, 0.0)))).unwrap();
 
-		for _ in 0..5 {
-			system.step(5.0);
+		for _ in 0..250 {
+			system.step(0.1);
 		}
 
 		{
@@ -1386,7 +1405,9 @@ mod tests {
 		println!("\n\n===========> Running zero step().");
 		system.step(EPSILON / 2.0); // Make sure the zero step doesn't cause everything to sleep.
 		println!("\n\n===========> Running starting step().");
-		system.step(1.0);
+		for _ in 0..10 {
+			system.step(0.1); // Use small time steps so sleeping works.
+		}
 		// The wall should immediately go to sleep.
 		assert!(system.get_entity(wall).unwrap().was_asleep());
 		// The ball shouldn't be asleep.
@@ -1394,7 +1415,9 @@ mod tests {
 
 		// Should only take 2 seconds to hit. Then should be at rest by 3 seconds.
 		println!("\n\n===========> Completing the hit.");
-		system.step(2.0);
+		for _ in 0..20 {
+			system.step(0.1); // Use small time steps so sleeping works.
+		}
 		// Both should now be asleep.
 		assert!(system.get_entity(wall).unwrap().was_asleep());
 		assert!(system.get_entity(ball).unwrap().was_asleep());
@@ -1410,7 +1433,9 @@ mod tests {
 			assert!(system.get_entity(wall).unwrap().was_asleep());
 		}
 		println!("\n\n===========> Simulating with x velocity at 1.");
-		system.step(1.0);
+		for _ in 0..10 {
+			system.step(0.1); // Use small time steps so sleeping works.
+		}
 		println!("\n\n===========> Setting velocity to zero.");
 		{// Then move the ball left a little, and verify that it goes back to rest and doesn't fall through the floor.
 			let mut entity = system.get_entity(ball).unwrap();
@@ -1422,8 +1447,10 @@ mod tests {
 			// The infinite mass wall should never wake up.
 			assert!(system.get_entity(wall).unwrap().was_asleep());
 		}
-		println!("\n\n===========> Final step!");
-		system.step(1.0);
+		println!("\n\n===========> Final steps!");
+		for _ in 0..10 {
+			system.step(0.1); // Use small time steps so sleeping works.
+		}
 		{ // It should then immediately go to sleep once the velocity is zero again.
 			let entity = system.get_entity(ball).unwrap();
 			assert!(entity.was_asleep());
@@ -1490,7 +1517,9 @@ mod tests {
 
 		// Should only take 2 seconds to hit. Then should be at rest by 3 seconds.
 		println!("\n\n===========> Letting the second hit.");
-		system.step(1.0);
+		for _ in 0..10 {
+			system.step(0.1); // Use small time steps so sleeping works.
+		}
 		// All should now be asleep.
 		assert!(system.get_entity(wall).unwrap().was_asleep());
 		assert!(system.get_entity(ball1).unwrap().was_asleep());

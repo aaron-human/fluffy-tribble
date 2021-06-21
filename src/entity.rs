@@ -37,6 +37,11 @@ pub struct InternalEntity {
 	/// All colliders that are attached/linked to this.
 	pub colliders : HashSet<ColliderHandle>,
 
+	/// Whether this entity is trying to go to sleep.
+	pub falling_asleep : bool,
+	/// How long (in seconds) that this entity has been falling asleep.
+	/// Above a certain threshold, it will completely go to sleep.
+	pub falling_asleep_time : f32,
 	/// Whether this has been put to sleep.
 	pub asleep : bool,
 
@@ -60,6 +65,9 @@ impl InternalEntity {
 			velocity: source.velocity,
 			angular_velocity: source.angular_velocity,
 			colliders: HashSet::new(),
+
+			falling_asleep: false,
+			falling_asleep_time: 0.0,
 
 			asleep: false,
 			neighbors: HashSet::new(),
