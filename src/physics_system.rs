@@ -16,6 +16,7 @@ use crate::plane_collider::{InternalPlaneCollider};
 use crate::mesh_collider::{InternalMeshCollider};
 use crate::collider_wrapper::ColliderWrapper;
 use crate::collision::{collide, Collision};
+use crate::collision_record::CollisionRecord;
 
 use crate::unary_force_generator::UnaryForceGenerator;
 
@@ -33,6 +34,11 @@ pub struct PhysicsSystem {
 	///
 	/// Defaults to 5.
 	pub iteration_max : u8,
+
+	/// A record of all of the collisions that happened last `step()`.
+	///
+	/// These will be ordered such that earlier collisions go first.
+	pub collision_records : Vec<CollisionRecord>,
 
 	/// The minimum amount of energy needed to prevent an entity from being put to sleep.
 	///
@@ -67,8 +73,9 @@ impl PhysicsSystem {
 			colliders : RefCell::new(Arena::new()),
 			unary_force_generators : RefCell::new(Arena::new()),
 			iteration_max : 5,
+			collision_records : Vec::new(),
 			energy_sleep_threshold : 0.001,
-			sleep_time_threshold: 0.1,
+			sleep_time_threshold : 0.1,
 
 			debug: Vec::new(),
 		}
@@ -308,6 +315,7 @@ impl PhysicsSystem {
 			return
 		}
 
+		self.collision_records.clear();
 		self.debug.clear();
 		// Go through all entities and perform the initial integration.
 		let mut entity_handles = Vec::with_capacity(self.entities.borrow().len());
@@ -362,6 +370,7 @@ impl PhysicsSystem {
 		// That should be able to split the world into islands of boxes that collide
 
 		let mut time_left = dt;
+		let mut current_time_percent : f32 = 0.0;
 		let mut concluded = false;
 		for iteration in 0..self.iteration_max {
 			// The simplest start is to find the closest collision, handle it, then move the simulation up to that point, and repeat looking for a collision.
@@ -483,6 +492,7 @@ impl PhysicsSystem {
 			// Re-adjust all of the movements to account for time stepping forward to just before (time_left * earliest_collision).
 			let mut entities = self.entities.borrow_mut();
 			let after_collision_percent = 1.0 - earliest_collision_percent;
+			current_time_percent += (1.0 - current_time_percent) * earliest_collision_percent;
 			let time_after_collision = time_left * after_collision_percent;
 			println!("Iteration {} -> Advanced time by {}.", iteration, time_left - time_after_collision);
 			for info in &mut entity_info {
@@ -506,6 +516,17 @@ impl PhysicsSystem {
 				let first_entity_handle  = earliest_collision_first_entity_handle.unwrap();
 				let second_entity_handle = earliest_collision_second_entity_handle.unwrap();
 
+				let mut record = CollisionRecord {
+					first_entity : first_entity_handle,
+					second_entity : second_entity_handle,
+					position : collision.position.clone(),
+					time : current_time_percent * dt,
+					normal : collision.normal.clone(),
+
+					restitution_coefficient : earliest_collision_restitution,
+					impulse_magnitude : 0.0,
+				};
+
 				let (first_option, second_option) = entities.get2_mut(first_entity_handle, second_entity_handle);
 				let mut first  = first_option.unwrap();
 				let mut second = second_option.unwrap();
@@ -517,6 +538,7 @@ impl PhysicsSystem {
 					earliest_collision_restitution,
 					&collision,
 				);
+				record.impulse_magnitude = impulse.magnitude();
 
 				//self.debug.push(format!("Before collision at {:?}: {:?} {:?}", collision.position, first.velocity, second.velocity));
 
@@ -580,6 +602,8 @@ impl PhysicsSystem {
 					entity_info[earliest_collision_first_info_index].neighbors.insert(second_entity_handle);
 					entity_info[earliest_collision_second_info_index].neighbors.insert(first_entity_handle);
 				}
+
+				self.collision_records.push(record);
 
 				//self.debug.push(format!("After friction energies: {:?} {:?}", first.get_total_energy(), second.get_total_energy()));
 			} else {

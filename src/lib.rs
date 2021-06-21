@@ -32,6 +32,8 @@ mod collision;
 mod force;
 pub use force::Force;
 
+mod collision_record;
+pub use collision_record::CollisionRecord;
 mod physics_system;
 pub use physics_system::PhysicsSystem;
 
