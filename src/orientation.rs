@@ -72,6 +72,24 @@ impl Orientation {
 		transform
 	}
 
+	/// Linearly interpolates between a starting and ending orientation.
+	pub fn lerp(time : f32, start : &Orientation, end : &Orientation) -> Orientation {
+		let opposite = 1.0 - time;
+		let rotation_vec = start.rotation_vec() * opposite + end.rotation_vec() * time;
+		Orientation {
+			position: start.position * opposite + end.position * time,
+			rotation: Quat::from_scaled_axis(rotation_vec),
+			internal_origin_offset: start.internal_origin_offset.clone(),
+		}
+	}
+
+	/// Converts a world position into local space.
+	///
+	/// So this applies the orientation's (inverse) rotation and (inverse) translation to the position.
+	pub fn position_into_local(&self, position : &Vec3) -> Vec3 {
+		self.into_local().transform_point(&Point3::from(*position)).coords
+	}
+
 	/// Converts a local position into world space.
 	///
 	/// So this applies the orientation's rotation and translation to the position.

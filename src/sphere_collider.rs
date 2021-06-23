@@ -1,8 +1,8 @@
 use crate::types::{Vec3, Mat3, EntityHandle};
 use crate::collider::{ColliderType, Collider, InternalCollider};
 
-/// An amount of radius that allows objects to just be "in contact" without being considered far enough in to force them to be pushed out.
-const CONTACT_MARGIN : f32 = 0.05;
+/// The minimum radius
+const MINIMUM_RADIUS : f32 = 0.05;
 
 /// The internal representation of a sphere collider.
 #[derive(Debug)]
@@ -180,7 +180,7 @@ impl SphereCollider {
 
 	/// If this is in a valid state.
 	pub fn is_valid(&self) -> bool {
-		CONTACT_MARGIN < self.radius && 0.0 <= self.mass
+		MINIMUM_RADIUS < self.radius && 0.0 <= self.mass
 	}
 }
 

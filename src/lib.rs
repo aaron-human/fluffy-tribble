@@ -25,6 +25,8 @@ mod plane_collider;
 pub use plane_collider::PlaneCollider;
 mod mesh_collider;
 pub use mesh_collider::MeshCollider;
+mod aligned_box_collider;
+pub use aligned_box_collider::AlignedBoxCollider;
 mod collider_wrapper;
 pub use collider_wrapper::ColliderWrapper;
 mod collision;

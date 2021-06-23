@@ -7,6 +7,7 @@ use crate::collider::{ColliderType, InternalCollider};
 use crate::sphere_collider::{InternalSphereCollider};
 use crate::plane_collider::{InternalPlaneCollider};
 use crate::mesh_collider::{InternalMeshCollider};
+use crate::aligned_box_collider::{InternalAlignedBoxCollider};
 use crate::orientation::{Orientation};
 
 /// A structure for storing collision information.
@@ -21,7 +22,13 @@ pub struct Collision {
 }
 
 impl Collision {
-	//
+	/// Passes the position and normal information through the inverse of the passed in Orientations.
+	/// The start is the orientation at time=0 and the end is at time=1.0.
+	pub fn transform_out_of(&mut self, start : &Orientation, end : &Orientation) {
+		let orientation = Orientation::lerp(self.times.min(), start, end);
+		self.position = orientation.position_into_world(&self.position);
+		self.normal   = orientation.direction_into_world(&self.normal);
+	}
 }
 
 /// Tries to collide any two arbitrary colliders.
@@ -197,6 +204,55 @@ pub fn collide(collider1 : &Box<dyn InternalCollider>, start1 : &Orientation, en
 			start2,
 			end2,
 		);
+	}
+
+	if ColliderType::SPHERE == collider1.get_type() && ColliderType::ALIGNED_BOX == collider2.get_type() {
+		// Translate the sphere's location into the box's local space.
+		let sphere = collider1.downcast_ref::<InternalSphereCollider>().unwrap();
+		let aligned_box = collider2.downcast_ref::<InternalAlignedBoxCollider>().unwrap();
+
+		let sphere_start_position = start2.position_into_local(&start1.position_into_world(&sphere.center));
+		let sphere_end_position = end2.position_into_local(&end1.position_into_world(&sphere.center));
+
+		let result_option = collide_sphere_with_aligned_box(
+			sphere.radius,
+			&sphere_start_position,
+			&(sphere_end_position - sphere_start_position),
+			&aligned_box.min_corner,
+			&aligned_box.max_corner,
+		);
+
+		if let Some(mut result) = result_option {
+			result.transform_out_of(&start2, &end2);
+			return Some(result);
+		} else {
+			return None;
+		}
+	}
+
+	if ColliderType::ALIGNED_BOX == collider1.get_type() && ColliderType::SPHERE == collider2.get_type() {
+		// Translate the sphere's location into the box's local space.
+		let sphere = collider2.downcast_ref::<InternalSphereCollider>().unwrap();
+		let aligned_box = collider1.downcast_ref::<InternalAlignedBoxCollider>().unwrap();
+
+		let sphere_start_position = start1.position_into_local(&start2.position_into_world(&sphere.center));
+		let sphere_end_position = end1.position_into_local(&end2.position_into_world(&sphere.center));
+
+		let result_option = collide_sphere_with_aligned_box(
+			sphere.radius,
+			&sphere_start_position,
+			&(sphere_end_position - sphere_start_position),
+			&aligned_box.min_corner,
+			&aligned_box.max_corner,
+		);
+
+		if let Some(mut result) = result_option {
+			result.transform_out_of(&start1, &end1);
+			result.normal *= -1.0; // The normal always points off of the sphere, but must return a normal pointing off of the first collider (the box).
+			return Some(result);
+		} else {
+			return None;
+		}
 	}
 
 	None
@@ -1044,6 +1100,138 @@ mod tests {
 			).unwrap();
 			assert!((hit.times.min() - 0.5).abs() < EPSILON);
 			assert!((hit.position - Vec3::new(1.0, 0.0, 0.0)).magnitude() < EPSILON);
+		}
+	}
+}
+
+/// Collide a sphere with an axis-aligned box.
+///
+/// The sphere is in the axis-aligned box's space. (As is the resulting collision description.)
+///
+/// The normal will always point off of the sphere.
+fn collide_sphere_with_aligned_box(radius : f32, center : &Vec3, movement : &Vec3, min_corner : &Vec3, max_corner : &Vec3) -> Option<Collision> {
+	// There are 3 types of checks to perform:
+	// 1. Check when/if the sphere hits each of the 6 surfaces.
+	// 2. Check when/if the sphere hits any of the 12 edges.
+	// 3. Check when/if the sphere hits any of the 8 corners.
+	let zero_vec = Vec3::zeros();
+	let mut accumulator = EarliestCollisionAccumulator::new();
+	{
+		// The 6 surfaces are the easiest: flatten the collision checking along each axis separately.
+		// Then for each axis, figure out when the center is at least radius from the box AND when the center is within the box's sides.
+		// Then the collision is just adding combinations of those collisions together.
+		let box_x_range = Range::range(min_corner.x, max_corner.x);
+		let box_y_range = Range::range(min_corner.y, max_corner.y);
+		let box_z_range = Range::range(min_corner.z, max_corner.z);
+		let sphere_x_range = Range::range(center.x - radius, center.x + radius);
+		let sphere_y_range = Range::range(center.y - radius, center.y + radius);
+		let sphere_z_range = Range::range(center.z - radius, center.z + radius);
+		let x_narrow_overlap_times = box_x_range.linear_overlap(&Range::single(center.x), movement.x);
+		let x_broad_overlap_times  = box_x_range.linear_overlap(&sphere_x_range, movement.x);
+		let y_narrow_overlap_times = box_y_range.linear_overlap(&Range::single(center.y), movement.y);
+		let y_broad_overlap_times  = box_y_range.linear_overlap(&sphere_y_range, movement.y);
+		let z_narrow_overlap_times = box_z_range.linear_overlap(&Range::single(center.z), movement.z);
+		let z_broad_overlap_times  = box_z_range.linear_overlap(&sphere_z_range, movement.z);
+		let x_overlap_times = x_broad_overlap_times.intersect(&y_narrow_overlap_times).intersect(&z_narrow_overlap_times);
+		let y_overlap_times = x_narrow_overlap_times.intersect(&y_broad_overlap_times).intersect(&z_narrow_overlap_times);
+		let z_overlap_times = x_narrow_overlap_times.intersect(&y_narrow_overlap_times).intersect(&z_broad_overlap_times);
+		// Then combine everything into one value.
+		let mut minimum_times = x_overlap_times.contain(&y_overlap_times).contain(&z_overlap_times);
+		// Must be between zero and one.
+		minimum_times = minimum_times.intersect(&Range::range(0.0, 1.0));
+		// Then use the time and normal to submit a full Collision object.
+		if !minimum_times.is_empty() {
+			let center_at_collision = center + movement * minimum_times.min();
+			let box_center = (min_corner + max_corner) / 2.0;
+			let box_size = max_corner - min_corner;
+			let mut normal = box_center - center_at_collision;
+			normal.x /= box_size.x;
+			normal.y /= box_size.y;
+			normal.z /= box_size.z;
+			if normal.x.abs() < normal.y.abs() {
+				if normal.y.abs() < normal.z.abs() {
+					normal = Vec3::new(0.0, 0.0, normal.z.signum());
+				} else {
+					normal = Vec3::new(0.0, normal.y.signum(), 0.0);
+				}
+			} else {
+				if normal.x.abs() < normal.z.abs() {
+					normal = Vec3::new(0.0, 0.0, normal.z.signum());
+				} else {
+					normal = Vec3::new(normal.x.signum(), 0.0, 0.0);
+				}
+			}
+			accumulator.consider(Some(Collision {
+				times : minimum_times,
+				position: center_at_collision + normal * radius,
+				normal,
+			}));
+		}
+	}
+	// Use the existing for the sphere-line segment collision checking.
+	let corners = vec![
+		Vec3::new(min_corner.x, min_corner.y, min_corner.z),
+		Vec3::new(max_corner.x, min_corner.y, min_corner.z),
+		Vec3::new(min_corner.x, max_corner.y, min_corner.z),
+		Vec3::new(max_corner.x, max_corner.y, min_corner.z),
+		Vec3::new(min_corner.x, min_corner.y, max_corner.z),
+		Vec3::new(max_corner.x, min_corner.y, max_corner.z),
+		Vec3::new(min_corner.x, max_corner.y, max_corner.z),
+		Vec3::new(max_corner.x, max_corner.y, max_corner.z),
+	];
+	let edge_indices : Vec<(usize, usize)> = vec![
+		// All the +x.
+		(0, 1),
+		(2, 3),
+		(4, 5),
+		(6, 7),
+		// All the +y.
+		(0, 2),
+		(1, 3),
+		(4, 6),
+		(5, 7),
+		// All the +z.
+		(0, 4),
+		(1, 5),
+		(2, 6),
+		(3, 7),
+	];
+	for (start_index, end_index) in edge_indices {
+		accumulator.consider(collide_sphere_with_mid_line_segment( // TODO: Could optimize this probably since all the normals are along axes?
+			radius, center, movement,
+			&corners[start_index], &corners[end_index], &zero_vec,
+		));
+	}
+	// Use the existing point-sphere collision checking for the corner points.
+	for corner in &corners {
+		accumulator.consider(collide_sphere_with_sphere(
+			radius, center, movement,
+			0.0, corner, &zero_vec,
+		));
+	}
+	accumulator.get()
+}
+
+
+#[cfg(test)]
+mod tests2 {
+	use crate::consts::EPSILON;
+	use super::*;
+
+	#[test]
+	fn check_collide_sphere_with_box() {
+		{ // Two spheres moving toward eachother.
+			let hit = collide_sphere_with_sphere(
+				1.0,
+				&Vec3::new(1.0, 1.0, 1.0),
+				&Vec3::new(2.0, 0.0, 0.0),
+				1.0,
+				&Vec3::new(5.0, 1.0, 1.0),
+				&Vec3::new(-2.0, 0.0, 0.0),
+			).unwrap();
+			assert!((hit.times.min() - 0.5).abs() < EPSILON);
+			assert!((hit.position - Vec3::new(3.0, 1.0, 1.0)).magnitude() < EPSILON);
+			assert!((hit.normal - Vec3::new(1.0, 0.0, 0.0)).magnitude() < EPSILON);
 		}
 	}
 }

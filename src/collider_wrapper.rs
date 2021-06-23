@@ -2,6 +2,7 @@ use crate::null_collider::NullCollider;
 use crate::sphere_collider::SphereCollider;
 use crate::plane_collider::PlaneCollider;
 use crate::mesh_collider::MeshCollider;
+use crate::aligned_box_collider::AlignedBoxCollider;
 
 /// How [crate::Collider] generics are passed into [crate::PhysicsSystem].
 ///
@@ -11,4 +12,5 @@ pub enum ColliderWrapper {
 	Sphere(SphereCollider),
 	Plane(PlaneCollider),
 	Mesh(MeshCollider),
+	AlignedBox(AlignedBoxCollider),
 }

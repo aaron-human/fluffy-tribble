@@ -20,19 +20,21 @@ The colliders may not be 100% setup yet.  I'm trying to avoid collision detectio
 
 Here are the collider combinations that should work so far:
 
-|                   | Sphere | Plane<sup>1</sup> |           Mesh          |
-|-------------------|--------|-------------------|-------------------------|
-| Sphere            |  DONE  |        DONE       |           DONE          |
-| Plane<sup>1</sup> |  DONE  |  N/A<sup>2</sup>  |           DONE          |
-| Mesh              |  DONE  |        DONE       | IN PROGRESS<sup>3</sup> |
+|                   |   Sphere    | Plane<sup>1</sup> |           Mesh          | Box<sup>2</sup> |
+|-------------------|-------------|-------------------|-------------------------|-----------------|
+| Sphere            |  DONE       |        DONE       |           DONE          |   IN PROGRESS   |
+| Plane<sup>1</sup> |  DONE       |  N/A<sup>3</sup>  |           DONE          |      TODO       |
+| Mesh              |  DONE       |        DONE       | IN PROGRESS<sup>4</sup> |      TODO       |
+| Box<sup>2</sup>   | IN PROGRESS |        TODO       |           TODO          |      TODO       |
 
 Notes:
 
 1. There are a few things worth noting about plane colliders:
 	* They are _infinite_ planes.  These bisect space and only allow things to move freely on one side of the plane.  These are intended to be used as "world boundaries" to keep things within some convex area.
 	* They aren't intended to handle rotations.
-2. Since planes are infinite, it doesn't really make sense to try and collide them.  They're either parallel, or they collide somewhere.
-3. Mesh-mesh collision is basically two types of check: (1) collide the verticies of one mesh against the surfaces of the other, and (2) collide the edges agasint eachother.  The first is functioning.  The second is a TODO item.  In this state, collision _mostly_ works, but things can definitely still glitch into eachother.
+2. The "box" is an axis-aligned bounding box (rectangular prism).
+3. Since planes are infinite, it doesn't really make sense to try and collide them.  They're either parallel, or they collide somewhere.
+4. Mesh-mesh collision is basically two types of check: (1) collide the verticies of one mesh against the surfaces of the other, and (2) collide the edges agasint eachother.  The first is functioning.  The second is a TODO item.  In this state, collision _mostly_ works, but things can definitely still glitch into eachother.
 
 **Warning:** Broad-phase collision handling hasn't been setup yet.  So everything is basically `O(N^2)` right now.
 

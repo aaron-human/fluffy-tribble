@@ -13,8 +13,10 @@ pub enum ColliderType {
 	SPHERE,
 	/// For the [crate::PlaneCollider].
 	PLANE,
-	/// For the [create::MeshCollider],
+	/// For the [crate::MeshCollider].
 	MESH,
+	/// For the [crate::AlignedBox].
+	ALIGNED_BOX,
 }
 
 /// The internal representation of an arbitrary collider.
